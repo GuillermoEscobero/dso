@@ -104,6 +104,7 @@ int mythread_create (void (*fun_addr)(),int priority)
   t_state[i].tid = i;
   t_state[i].run_env.uc_stack.ss_size = STACKSIZE;
   t_state[i].run_env.uc_stack.ss_flags = 0;
+  t_state[i].ticks = QUANTUM_TICKS;
   makecontext(&t_state[i].run_env, fun_addr, 1);
 
   enqueue(q, &t_state[i]);
@@ -157,23 +158,17 @@ int mythread_gettid(){
 
 /* FIFO para alta prioridad, RR para baja*/
 TCB* scheduler(){
-
-  /*
-  int i;
-  for(i=0; i<N; i++){
-    if (t_state[i].state == INIT) {
-        current = i;
-	  return &t_state[i];
-    }
-  }
-  */
   if(queue_empty(q) == 1) {
     printf("mythread_free: No thread in the system\nExiting...\n");
     exit(1);
   }
 
   TCB *aux = dequeue(q);
-  enqueue(q, aux);
+
+  while(aux->state == FREE) {
+    aux = dequeue(q);
+  }
+
   return aux;
 }
 
@@ -181,10 +176,17 @@ TCB* scheduler(){
 /* Timer interrupt  */
 void timer_interrupt(int sig)
 {
+  if(running != NULL)
+    running->ticks -= 1;
+
+  activator(scheduler());
 }
 
 /* Activator */
 void activator(TCB* next){
+  if(running->ticks > 0) {
+    enqueue(q, running);
+  }
   setcontext (&(next->run_env));
   printf("mythread_free: After setcontext, should never get here!!...\n");
 }

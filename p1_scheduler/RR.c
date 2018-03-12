@@ -18,6 +18,8 @@ void network_interrupt(int sig);
 /* Array of state thread control blocks: the process allows a maximum of N threads */
 static TCB t_state[N];
 
+struct queue *q;
+
 /* Current running thread */
 static TCB* running;
 static int current = 0;
@@ -68,6 +70,10 @@ void init_mythreadlib() {
   t_state[0].tid = 0;
   running = &t_state[0];
 
+  q = queue_new();
+
+  enqueue(q, running);
+
   /* Initialize network and clock interrupts */
   init_network_interrupt();
   init_interrupt();
@@ -99,6 +105,9 @@ int mythread_create (void (*fun_addr)(),int priority)
   t_state[i].run_env.uc_stack.ss_size = STACKSIZE;
   t_state[i].run_env.uc_stack.ss_flags = 0;
   makecontext(&t_state[i].run_env, fun_addr, 1);
+
+  enqueue(q, &t_state[i]);
+
   return i;
 } /****** End my_thread_create() ******/
 
@@ -148,15 +157,24 @@ int mythread_gettid(){
 
 /* FIFO para alta prioridad, RR para baja*/
 TCB* scheduler(){
+
+  /*
   int i;
   for(i=0; i<N; i++){
     if (t_state[i].state == INIT) {
         current = i;
-	return &t_state[i];
+	  return &t_state[i];
     }
   }
-  printf("mythread_free: No thread in the system\nExiting...\n");
-  exit(1);
+  */
+  if(queue_empty(q) == 1) {
+    printf("mythread_free: No thread in the system\nExiting...\n");
+    exit(1);
+  }
+
+  TCB *aux = dequeue(q);
+  enqueue(q, aux);
+  return aux;
 }
 
 

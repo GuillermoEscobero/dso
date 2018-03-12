@@ -152,7 +152,7 @@ TCB* scheduler(){
   for(i=0; i<N; i++){
     if (t_state[i].state == INIT) {
         current = i;
-	      return &t_state[i];
+	return &t_state[i];
     }
   }
   printf("mythread_free: No thread in the system\nExiting...\n");

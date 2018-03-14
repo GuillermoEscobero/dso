@@ -107,7 +107,7 @@ int mythread_create (void (*fun_addr)(),int priority)
   t_state[i].run_env.uc_stack.ss_size = STACKSIZE;
   t_state[i].run_env.uc_stack.ss_flags = 0;
   t_state[i].ticks = QUANTUM_TICKS;
-  makecontext(&t_state[i].run_env, fun_addr, 1);
+  makecontext(&t_state[i].run_env, &fun_addr, 1);
 
   disable_interrupt();
   enqueue(q, &t_state[i]);

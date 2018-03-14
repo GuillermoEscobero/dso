@@ -72,7 +72,9 @@ void init_mythreadlib() {
 
   q = queue_new();
 
+  disable_interrupt();
   enqueue(q, running);
+  enable_interrupt();
 
   /* Initialize network and clock interrupts */
   init_network_interrupt();
@@ -107,7 +109,9 @@ int mythread_create (void (*fun_addr)(),int priority)
   t_state[i].ticks = QUANTUM_TICKS;
   makecontext(&t_state[i].run_env, fun_addr, 1);
 
+  disable_interrupt();
   enqueue(q, &t_state[i]);
+  enable_interrupt();
 
   return i;
 } /****** End my_thread_create() ******/
@@ -163,10 +167,16 @@ TCB* scheduler(){
     exit(1);
   }
 
+  disable_interrupt();
   TCB *aux = dequeue(q);
+  enable_interrupt();
+
 
   while(aux->state == FREE) {
+    disable_interrupt();
     aux = dequeue(q);
+    enable_interrupt();
+
   }
 
   return aux;
@@ -185,8 +195,11 @@ void timer_interrupt(int sig)
 /* Activator */
 void activator(TCB* next){
   if(running->ticks > 0) {
+    disable_interrupt();
     enqueue(q, running);
+    enable_interrupt();
   }
+  running = next;
   setcontext (&(next->run_env));
   printf("mythread_free: After setcontext, should never get here!!...\n");
 }

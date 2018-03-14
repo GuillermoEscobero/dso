@@ -97,7 +97,7 @@ int mythread_create (void (*fun_addr)(),int priority)
   }
   t_state[i].state = INIT;
   t_state[i].priority = priority;
-  t_state[i].function = fun_addr;
+  t_state[i].function = *fun_addr;
   t_state[i].run_env.uc_stack.ss_sp = (void *)(malloc(STACKSIZE));
   if(t_state[i].run_env.uc_stack.ss_sp == NULL){
     printf("*** ERROR: thread failed to get stack space\n");
@@ -107,7 +107,7 @@ int mythread_create (void (*fun_addr)(),int priority)
   t_state[i].run_env.uc_stack.ss_size = STACKSIZE;
   t_state[i].run_env.uc_stack.ss_flags = 0;
   t_state[i].ticks = QUANTUM_TICKS;
-  makecontext(&t_state[i].run_env, &fun_addr, 1);
+  makecontext(&t_state[i].run_env, fun_addr, 1);
 
   disable_interrupt();
   enqueue(q, &t_state[i]);

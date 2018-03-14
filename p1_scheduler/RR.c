@@ -97,7 +97,7 @@ int mythread_create (void (*fun_addr)(),int priority)
   }
   t_state[i].state = INIT;
   t_state[i].priority = priority;
-  t_state[i].function = *fun_addr;
+  t_state[i].function = fun_addr;
   t_state[i].run_env.uc_stack.ss_sp = (void *)(malloc(STACKSIZE));
   if(t_state[i].run_env.uc_stack.ss_sp == NULL){
     printf("*** ERROR: thread failed to get stack space\n");

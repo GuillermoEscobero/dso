@@ -200,6 +200,6 @@ void activator(TCB* next){
     enable_interrupt();
   }
   running = next;
-  setcontext(&(next->run_env));
+  setcontext (&(next->run_env));
   printf("mythread_free: After setcontext, should never get here!!...\n");
 }

@@ -24,6 +24,8 @@ struct queue *q;
 static TCB* running;
 static int current = 0;
 
+static TCB* currentaux;
+
 /* Variable indicating if the library is initialized (init == 1) or not (init == 0) */
 static int init=0;
 
@@ -199,7 +201,8 @@ void activator(TCB* next){
     enqueue(q, running);
     enable_interrupt();
   }
+  currentaux = running;
   running = next;
-  setcontext (&(next->run_env));
+  swapcontext (&(currentaux->run_env), &(next->run_env));
   printf("mythread_free: After setcontext, should never get here!!...\n");
 }

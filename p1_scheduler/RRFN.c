@@ -79,7 +79,7 @@ void init_mythreadlib() {
   q_wait = queue_new();
   
   /* Initialize network and clock interrupts */
-  //init_network_interrupt();
+  init_network_interrupt();
   init_interrupt();
 }
 
@@ -124,6 +124,7 @@ int mythread_create (void (*fun_addr)(),int priority)
   makecontext(&t_state[i].run_env, fun_addr, 1);
 
   if(priority == HIGH_PRIORITY && running->priority == LOW_PRIORITY) {
+    printf("*** THREAD %d PREEMPTED: SET CONTEXT OF %d", running->tid, i);
     activator(&t_state[i]);
   }
   return i;
@@ -132,18 +133,31 @@ int mythread_create (void (*fun_addr)(),int priority)
 /* Read network syscall */
 int read_network()
 {
+   disable_interrupt();
+   printf("enqueued in wait: %d\n", running->tid);
+   enqueue(q_wait, running);
+   enable_interrupt();
    return 1;
 }
 
 /* Network interrupt  */
 void network_interrupt(int sig)
 {
+    printf("------Packet received -----\n");
+
     if(queue_empty(q_wait) != 1) {
+        printf("USED\n");
         disable_interrupt();
-        enqueue(q_wait, running);
         TCB* next = dequeue(q_wait);
+        printf("DEQUEUED FROM WAIT: %d\n", next->tid);
+        if(next->priority == LOW_PRIORITY) {
+            enqueue(q_low, next);
+        } else {
+            enqueue(q_high, next);
+        }
         enable_interrupt();
-        activator(next);
+    } else {
+        printf("DISCARDED\n");
     }
 }
 
@@ -180,7 +194,7 @@ int mythread_gettid(){
 
 /* FIFO para alta prioridad, RR para baja*/
 TCB* scheduler(){
-  if(queue_empty(q_low) == 1 && queue_empty(q_high) == 1) {
+  if(queue_empty(q_low) == 1 && queue_empty(q_high) == 1 && queue_empty(q_wait) == 1) {
     printf("*** THREAD %d FINISHED\n", current);
     printf("FINISH\n");
     exit(1);
@@ -193,11 +207,15 @@ TCB* scheduler(){
       return nextH;
   }
 
-  disable_interrupt();
-  TCB* next = dequeue(q_low);
-  enable_interrupt();
+  if(queue_empty(q_low) != 1) {
+      disable_interrupt();
+      TCB* next = dequeue(q_low);
+      enable_interrupt();
+      return next;
+  }
 
-  return next;
+  /* Threads remain in wait queue */
+  return &idle;
 }
 
 

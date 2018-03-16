@@ -122,6 +122,7 @@ int mythread_create (void (*fun_addr)(),int priority)
   makecontext(&t_state[i].run_env, fun_addr, 1);
 
   if(priority == HIGH_PRIORITY && running->priority == LOW_PRIORITY) {
+    printf("*** THREAD %d PREEMPTED: SET CONTEXT OF %d", running->tid, i);
     activator(&t_state[i]);
   }
   return i;
@@ -196,7 +197,7 @@ TCB* scheduler(){
 void timer_interrupt(int sig)
 {
     running->ticks--;
-    //printf("Running thread %d with %d ticks, %d\n", running->tid, running->ticks, running->priority);
+    printf("Running thread %d with %d ticks, %d\n", running->tid, running->ticks, running->priority);
     if(running->ticks == 0 && running->priority == LOW_PRIORITY) {
         running->ticks = QUANTUM_TICKS;
         activator(scheduler());

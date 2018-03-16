@@ -136,6 +136,7 @@ int read_network()
 {
     disable_interrupt();
     enqueue(q_wait, running);
+    printf("*** THREAD %d READ FROM NETWORK\n", current);
     enable_interrupt();
     activator(&idle);
     return 1;
@@ -152,6 +153,7 @@ void network_interrupt(int sig)
         } else if(temp->priority == HIGH_PRIORITY) {
             enqueue(q_high, temp);
         }
+        printf("*** THREAD %d READY\n", temp->tid);
         enable_interrupt();
     }
 }

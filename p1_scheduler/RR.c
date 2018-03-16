@@ -175,7 +175,6 @@ TCB* scheduler(){
 void timer_interrupt(int sig)
 {
     running->ticks--;
-    printf("RUNNING: %d with %d ticks\n", running->tid, running->ticks);
     if(running->ticks == 0) {
         running->ticks = QUANTUM_TICKS;
         activator(scheduler());
@@ -197,15 +196,15 @@ void activator(TCB* next){
       running->ticks = QUANTUM_TICKS;
       setcontext(&(next->run_env));
   } else if(running != next){
+    disable_interrupt();
     TCB* aux;
     memcpy(&aux, &running, sizeof(TCB*));
-    disable_interrupt();
     enqueue(q, running);
     enable_interrupt();
     running = next;
     current = next->tid;
     running->ticks = QUANTUM_TICKS;
-    swapcontext(&(aux->run_env), &(next->run_env));
     printf("*** SWAPCONTEXT FROM %d TO %d\n", aux->tid, next->tid);
+    swapcontext(&(aux->run_env), &(next->run_env));
   }
 }

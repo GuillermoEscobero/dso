@@ -74,8 +74,9 @@ void init_mythreadlib() {
   disable_interrupt();
   q = queue_new();
   enable_interrupt();
+  
   /* Initialize network and clock interrupts */
-  init_network_interrupt();
+  //init_network_interrupt();
   init_interrupt();
 }
 

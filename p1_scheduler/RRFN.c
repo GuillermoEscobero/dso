@@ -21,7 +21,8 @@ static TCB t_state[N];
 struct queue *q_low;
 struct queue *q_high;
 struct queue *q_wait;
-//int ticks = 0;
+
+int ticks = 0;
 
 /* Current running thread */
 static TCB* running;
@@ -39,6 +40,9 @@ static void idle_function(){
 /* Initialize the thread library */
 void init_mythreadlib() {
   int i;
+  q_low = queue_new();
+  q_high = queue_new();
+  q_wait = queue_new();
   /* Create context for the idle thread */
   if(getcontext(&idle.run_env) == -1){
     perror("*** ERROR: getcontext in init_thread_lib");
@@ -73,10 +77,6 @@ void init_mythreadlib() {
   t_state[0].tid = 0;
   printf("*** THREAD %d READY\n", 0);
   running = &t_state[0];
-
-  q_low = queue_new();
-  q_high = queue_new();
-  q_wait = queue_new();
 
   /* Initialize network and clock interrupts */
   init_network_interrupt();
@@ -120,8 +120,7 @@ int mythread_create (void (*fun_addr)(),int priority)
 
   if(priority == HIGH_PRIORITY && running->priority == LOW_PRIORITY) {
     printf("*** THREAD %d PREEMPTED: SET CONTEXT OF %d\n", running->tid, i);
-    running = &t_state[i];
-    current = i;
+    activator(&t_state[i]);
   } else if(priority == HIGH_PRIORITY) {
     disable_interrupt();
     enqueue(q_high, &t_state[i]);
@@ -135,10 +134,11 @@ int mythread_create (void (*fun_addr)(),int priority)
 /* Read network syscall */
 int read_network()
 {
-   disable_interrupt();
-   enqueue(q_wait, running);
-   enable_interrupt();
-   return 1;
+    disable_interrupt();
+    enqueue(q_wait, running);
+    enable_interrupt();
+    activator(&idle);
+    return 1;
 }
 
 /* Network interrupt  */
@@ -146,15 +146,13 @@ void network_interrupt(int sig)
 {
     if(queue_empty(q_wait) != 1) {
         disable_interrupt();
-        TCB* next = dequeue(q_wait);
-        if(next->priority == LOW_PRIORITY) {
-            enqueue(q_low, next);
-        } else {
-            enqueue(q_high, next);
+        TCB* temp = dequeue(q_wait);
+        if(temp->priority == LOW_PRIORITY) {
+            enqueue(q_low, temp);
+        } else if(temp->priority == HIGH_PRIORITY) {
+            enqueue(q_high, temp);
         }
         enable_interrupt();
-    } else {
-        /* Discarded */
     }
 }
 
@@ -192,6 +190,7 @@ int mythread_gettid(){
 /* FIFO para alta prioridad, RR para baja*/
 TCB* scheduler(){
   if(queue_empty(q_low) == 1 && queue_empty(q_high) == 1) {
+    if(queue_empty(q_wait) != 1) return &idle;
     printf("*** THREAD %d FINISHED\n", current);
     printf("FINISH\n");
     exit(1);
@@ -204,14 +203,11 @@ TCB* scheduler(){
       return nextH;
   }
 
-  if(queue_empty(q_low) != 1) {
-      disable_interrupt();
-      TCB* next = dequeue(q_low);
-      enable_interrupt();
-      return next;
-  }
+  disable_interrupt();
+  TCB* next = dequeue(q_low);
+  enable_interrupt();
 
-  return &idle;
+  return next;
 }
 
 
@@ -224,10 +220,15 @@ void timer_interrupt(int sig)
         running->ticks = QUANTUM_TICKS;
         activator(scheduler());
     }
+
+    if(running->tid == -1) {
+        activator(scheduler());
+    }
 }
 
 /* Activator */
 void activator(TCB* next){
+    if(running == next) return;
   if(running->state == IDLE) {
     running = next;
     current = next->tid;

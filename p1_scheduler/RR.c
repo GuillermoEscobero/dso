@@ -69,11 +69,10 @@ void init_mythreadlib() {
   }
 
   t_state[0].tid = 0;
+  printf("*** THREAD %d READY\n", 0);
   running = &t_state[0];
 
-  disable_interrupt();
   q = queue_new();
-  enable_interrupt();
   
   /* Initialize network and clock interrupts */
   //init_network_interrupt();
@@ -132,6 +131,7 @@ void mythread_exit() {
   int tid = mythread_gettid();
   t_state[tid].state = FREE;
   free(t_state[tid].run_env.uc_stack.ss_sp);
+  
   TCB* next = scheduler();
   activator(next);
 }
@@ -159,6 +159,7 @@ int mythread_gettid(){
 /* FIFO para alta prioridad, RR para baja*/
 TCB* scheduler(){
   if(queue_empty(q) == 1) {
+    printf("*** THREAD %d FINISHED\n", current);
     printf("FINISH\n");
     exit(1);
   }

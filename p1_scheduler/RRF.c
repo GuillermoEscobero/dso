@@ -119,6 +119,7 @@ int mythread_create (void (*fun_addr)(),int priority)
         }
 
         if(priority == HIGH_PRIORITY && running->priority == LOW_PRIORITY) {
+                printf("*** THREAD %d READY\n", i);
                 printf("*** THREAD %d PREEMPTED: SET CONTEXT OF %d\n", running->tid, i);
                 activator(&t_state[i]);
         } else if(priority == HIGH_PRIORITY) {
@@ -145,7 +146,6 @@ void network_interrupt(int sig)
 /* Free terminated thread and exits */
 void mythread_exit() {
         int tid = mythread_gettid();
-
         printf("*** THREAD %d FINISHED\n", tid);
         t_state[tid].state = FREE;
         free(t_state[tid].run_env.uc_stack.ss_sp);
@@ -178,7 +178,9 @@ int mythread_gettid(){
 TCB* scheduler(){
         if(queue_empty(q_low) == 1 && queue_empty(q_high) == 1) {
                 /* No threads waiting */
-                /*printf("*** THREAD %d FINISHED\n", current);*/
+                if(running->state != FREE) {
+                    printf("*** THREAD %d FINISHED\n", current);
+                }
                 printf("FINISH\n");
                 exit(1);
         }
@@ -206,6 +208,7 @@ void timer_interrupt(int sig)
         running->ticks--;
         /* If the thread has not finished but completed the slice, change to the
          * next thread */
+        //printf("Thread %d running with %d ticks remaining, P%d\n", current, running->ticks, running->priority);
         if(running->ticks == 0 && running->priority == LOW_PRIORITY) {
                 /* Reset the counter for this thread */
                 running->ticks = QUANTUM_TICKS;
@@ -229,9 +232,7 @@ void activator(TCB* next){
                 TCB* aux;
                 memcpy(&aux, &running, sizeof(TCB*));
 
-                if(next->priority == LOW_PRIORITY) {
-                        enqueue(q_low, running);
-                }
+                enqueue(q_low, running);
                 enable_interrupt();
 
                 running = next;

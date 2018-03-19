@@ -137,10 +137,11 @@ int mythread_create (void (*fun_addr)(),int priority)
 int read_network()
 {
         disable_interrupt();
-        enqueue(q_wait, running);
+        int tid = mythread_gettid();
+        enqueue(q_wait, &t_state[tid]);
         printf("*** THREAD %d READ FROM NETWORK\n", current);
         enable_interrupt();
-        activator(&idle);
+        activator(scheduler());
         return 1;
 }
 
@@ -197,7 +198,9 @@ TCB* scheduler(){
         if(queue_empty(q_low) == 1 && queue_empty(q_high) == 1) {
                 /* No threads in queues. Check waiting queue */
                 if(queue_empty(q_wait) != 1) return &idle;
-                printf("*** THREAD %d FINISHED\n", current);
+                if(running->state != FREE) {
+                    printf("*** THREAD %d FINISHED\n", current);
+                }
                 printf("FINISH\n");
                 exit(1);
         }
@@ -259,7 +262,7 @@ void activator(TCB* next){
                 TCB* aux;
                 memcpy(&aux, &running, sizeof(TCB*));
                 
-                if(next->priority == LOW_PRIORITY) {
+                if(running->priority == LOW_PRIORITY) {
                         enqueue(q_low, running);
                 }
                 enable_interrupt();

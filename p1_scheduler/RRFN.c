@@ -73,7 +73,6 @@ void init_mythreadlib() {
         t_state[0].tid = 0;
 
         /* Set thread 0 as running */
-        printf("*** THREAD %d READY\n", 0);
         running = &t_state[0];
 
         /* Initialize queues for RRFN */
@@ -116,7 +115,6 @@ int mythread_create (void (*fun_addr)(),int priority)
         if(priority == LOW_PRIORITY) {
                 disable_interrupt();
                 enqueue(q_low, &t_state[i]);
-                printf("*** THREAD %d READY\n", i);
                 enable_interrupt();
         }
 
@@ -126,7 +124,6 @@ int mythread_create (void (*fun_addr)(),int priority)
         } else if(priority == HIGH_PRIORITY) {
                 disable_interrupt();
                 enqueue(q_high, &t_state[i]);
-                printf("*** THREAD %d READY\n", i);
                 enable_interrupt();
         }
 
@@ -197,7 +194,10 @@ int mythread_gettid(){
 TCB* scheduler(){
         if(queue_empty(q_low) == 1 && queue_empty(q_high) == 1) {
                 /* No threads in queues. Check waiting queue */
-                if(queue_empty(q_wait) != 1) return &idle;
+                if(queue_empty(q_wait) != 1) {
+                    return &idle;
+                }
+
                 if(running->state != FREE) {
                     printf("*** THREAD %d FINISHED\n", current);
                 }
@@ -243,8 +243,9 @@ void timer_interrupt(int sig)
 
 /* Activator */
 void activator(TCB* next){
-        if(running == next) return;
+        if(running == next) return; /* No sense on swaping context with the same thread */
         if(running->state == IDLE) {
+                /* If it comes from IDLE thread, no save of context is needed */
                 running = next;
                 current = next->tid;
                 running->ticks = QUANTUM_TICKS;
@@ -258,12 +259,18 @@ void activator(TCB* next){
                 running->ticks = QUANTUM_TICKS;
                 setcontext(&(next->run_env));
         } else if(running != next) {
+                /* We use swap context in order to save the context to execute 
+                 * the thread later */
                 disable_interrupt();
                 TCB* aux;
                 memcpy(&aux, &running, sizeof(TCB*));
                 
+                /* As RRFN has voluntary context switching, high priority 
+                 * threads can also be preempted */
                 if(running->priority == LOW_PRIORITY) {
                         enqueue(q_low, running);
+                } else if(running->priority == HIGH_PRIORITY) {
+                        enqueue(q_high, running);
                 }
                 enable_interrupt();
 

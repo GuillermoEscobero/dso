@@ -71,7 +71,6 @@ void init_mythreadlib() {
         t_state[0].tid = 0;
 
         /* Set thread 0 as running */
-        printf("*** THREAD %d READY\n", 0);
         running = &t_state[0];
 
         /* Initialize queue for RR */
@@ -112,7 +111,6 @@ int mythread_create (void (*fun_addr)(),int priority)
         /* Add the new thread to ready queue */
         disable_interrupt();
         enqueue(q, &t_state[i]);
-        printf("*** THREAD %d READY\n", i);
         enable_interrupt();
 
         return i;
@@ -165,7 +163,7 @@ int mythread_gettid(){
 /* FIFO para alta prioridad, RR para baja*/
 TCB* scheduler(){
         if(queue_empty(q) == 1) {
-                /*printf("*** THREAD %d FINISHED\n", current);*/
+                /* No threads remaining to be executed */
                 printf("FINISH\n");
                 exit(1);
         }
@@ -205,6 +203,7 @@ void activator(TCB* next){
                 running->ticks = QUANTUM_TICKS;
                 setcontext(&(next->run_env));
         } else if(running != next) {
+                /* We have to use swapcontext to not lose the current context */
                 disable_interrupt();
                 TCB* aux;
                 memcpy(&aux, &running, sizeof(TCB*));

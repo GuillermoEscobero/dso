@@ -72,7 +72,6 @@ void init_mythreadlib() {
         t_state[0].tid = 0;
 
         /* Set thread 0 as running */
-        printf("*** THREAD %d READY\n", 0);
         running = &t_state[0];
 
         /* Initialize queues for RRF */
@@ -114,18 +113,15 @@ int mythread_create (void (*fun_addr)(),int priority)
         if(priority == LOW_PRIORITY) {
                 disable_interrupt();
                 enqueue(q_low, &t_state[i]);
-                printf("*** THREAD %d READY\n", i);
                 enable_interrupt();
         }
 
         if(priority == HIGH_PRIORITY && running->priority == LOW_PRIORITY) {
-                printf("*** THREAD %d READY\n", i);
                 printf("*** THREAD %d PREEMPTED: SET CONTEXT OF %d\n", running->tid, i);
                 activator(&t_state[i]);
         } else if(priority == HIGH_PRIORITY) {
                 disable_interrupt();
                 enqueue(q_high, &t_state[i]);
-                printf("*** THREAD %d READY\n", i);
                 enable_interrupt();
         }
 
@@ -208,7 +204,6 @@ void timer_interrupt(int sig)
         running->ticks--;
         /* If the thread has not finished but completed the slice, change to the
          * next thread */
-        //printf("Thread %d running with %d ticks remaining, P%d\n", current, running->ticks, running->priority);
         if(running->ticks == 0 && running->priority == LOW_PRIORITY) {
                 /* Reset the counter for this thread */
                 running->ticks = QUANTUM_TICKS;
@@ -228,10 +223,13 @@ void activator(TCB* next){
                 running->ticks = QUANTUM_TICKS;
                 setcontext(&(next->run_env));
         } else if(running != next) {
+                /* As running thread is not finished, we use swapcontext to not lose its context */
                 disable_interrupt();
                 TCB* aux;
                 memcpy(&aux, &running, sizeof(TCB*));
 
+                /* Only low threads are preempted, in this block of code only 
+                 * enters low-priority running */
                 enqueue(q_low, running);
                 enable_interrupt();
 

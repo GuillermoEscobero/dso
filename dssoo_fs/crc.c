@@ -1,9 +1,9 @@
 /*
- * OPERATING SYSTEMS DESING - 16/17
+ * OPERATING SYSTEMS DESING - 17/18
  *
  * @file 	crc.c
  * @brief 	Implementation of the CRC functionality.
- * @date	01/03/2017
+ * @date	04/03/2018
  *
  * DO NOT MODIFY
  */
@@ -54,6 +54,7 @@ static const uint16_t crc16tab[256]= {
  *
  * @param	<buffer> to compute the CRC on.
  * @param	<length> of the buffer, in bytes.
+ * @param	<prev_crc> CRC of the previous block.
  * @return	A 16-bit unsigned integer containing the resulting CRC.
  *
  ****************************************************************************************
@@ -85,9 +86,10 @@ uint16_t CRC16(const unsigned char* buffer, unsigned int length, uint16_t prev_c
  *
  * @param	<buffer> to compute the CRC on.
  * @param	<length> of the buffer, in bytes.
+ * @param	<prev_crc> CRC of the previous block.
  * @return	A 32-bit unsigned integer containing the resulting CRC.
  */
-uint32_t CRC32(const unsigned char* buffer, unsigned int length, uint32_t prv_crc)
+uint32_t CRC32(const unsigned char* buffer, unsigned int length, uint32_t prev_crc)
 {
 	return (uint32_t) (crc32(crc32(prev_crc, Z_NULL, 0), buffer, length) & 0xFFFFFFFF);
 }

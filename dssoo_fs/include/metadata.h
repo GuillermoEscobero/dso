@@ -64,6 +64,11 @@ char *i_map;   /* numInodes */
 char *b_map;   /* dataBlockNum */
 inode_t inodes[MAX_FILESYSTEM_OBJECTS_SUPPORTED];
 
+struct {
+  int position;
+  int opened;
+} inodes_x[MAX_FILESYSTEM_OBJECTS_SUPPORTED];
+
 typedef struct {
   unsigned int magicNum;              /* Magic number of the superblock: 0x000D5500 */
   unsigned int inodeMapNumBlocks;     /* Number of blocks of the i-node map */
@@ -83,8 +88,3 @@ typedef struct {
   unsigned int directBlock;
   char padding[BLOCK_SIZE-844];
 } inode_t;
-
-struct {
-  int position;
-  int opened;
-} inodes_x*;

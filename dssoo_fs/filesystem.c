@@ -40,7 +40,6 @@ int mkFS(long deviceSize)
 
 	long inodeBlocks = (MAX_FILESYSTEM_OBJECTS_SUPPORTED*sizeof(inode_t))/BLOCK_SIZE;
 
-	// sblock = (superblock_t*)malloc(sizeof(superblock_t));
 	sblock.magicNum 				 = MAGIC_NUMBER;
 	sblock.inodeMapNumBlocks = MAX_FILESYSTEM_OBJECTS_SUPPORTED;
 	sblock.dataMapNumBlock 	 = MAX_FILESYSTEM_OBJECTS_SUPPORTED;
@@ -80,7 +79,26 @@ int mkFS(long deviceSize)
  */
 int mountFS(void)
 {
-	return -1;
+	int i;
+	/* Read disk block 1 and store it into sblock */
+	bread(DISK, 1, &(sblock));
+
+	/* Read from disk inode map */
+	for (i = 0; i < sblock.inodeMapNumBlocks; i++) {
+		bread(DISK, 2+i, ((char *)i_map + i*BLOCK_SIZE));
+	}
+
+	/* Read disk block map */
+	for (i = 0; i < sblock.dataMapNumBlock; i++) {
+		bread(DISK, 2+i+sblock.inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE));
+	}
+
+	/* Read inodes from disk */
+	for (i = 0; i < (sblock.numInodes*sizeof(inode_t)/BLOCK_SIZE); i++) {
+		bread(DISK, i+sblock.firstInode, ((char *)inodes + i*BLOCK_SIZE));
+	}
+
+	return 1;
 }
 
 /*
@@ -89,7 +107,15 @@ int mountFS(void)
  */
 int unmountFS(void)
 {
-	return -1;
+	int i;
+	for (i = 0; i < sblock.numInodes; i++) {
+		if(inodes_x[i].opened == 1) {
+			return -1;
+		}
+	}
+
+	sync();
+	return 0;
 }
 
 /*
@@ -98,7 +124,20 @@ int unmountFS(void)
  */
 int createFile(char *fileName)
 {
-	return -2;
+	int b_id, inode_id;
+
+	inode_id = ialloc();
+	if(inode_id < 0) {return inode_id;}
+	b_id = alloc();
+	if(b_id < 0) {ifree(inode_id); return b_id;}
+
+	inodes[inode_id].type = 1; /* FILE */
+	strcpy(inodes[inode_id].name, name);
+	inodes[inode_id].directBlock = b_id;
+	inodes_x[inode_id].position = 0;
+	inodes_x[inode_id].opened = 1;
+
+	return 0;
 }
 
 /*
@@ -107,7 +146,16 @@ int createFile(char *fileName)
  */
 int removeFile(char *fileName)
 {
-	return -2;
+	int inode_id;
+
+	inode_id = namei(name);
+	if (inode_id < 0) return -1;
+
+	free(inodes[inode_id].directBlock);
+	memset(&(inodes[inode_id]), 0, sizeof(diskInodeType));
+	ifree(inode_id);
+
+	return 0;
 }
 
 /*
@@ -116,7 +164,17 @@ int removeFile(char *fileName)
  */
 int openFile(char *fileName)
 {
-	return -2;
+	int inode_id;
+
+	inode_id = namei(name);
+	if (inode_id < 0) {
+		return inode_id;
+	}
+
+	inodes_x[inode_id].position = 0;
+	inodes_x[inode_id].opened = 1;
+
+	return inode_id;
 }
 
 /*
@@ -125,7 +183,14 @@ int openFile(char *fileName)
  */
 int closeFile(int fileDescriptor)
 {
-	return -1;
+	if (fd < 0) {
+		return -1;
+	}
+
+	inodes_x[fd].position = 0;
+	inodes_x[fd].opened = 0;
+
+	return 0;
 }
 
 /*
@@ -134,7 +199,23 @@ int closeFile(int fileDescriptor)
  */
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
-	return -1;
+	char b[BLOCK_SIZE];
+	int b_id;
+
+	if (inodes_x[fd].position+size > inodes[fd].size) {
+		size = inodes[fd].size - inodes_x[fd].position;
+	}
+
+	if (size =< 0) {
+		return -1;
+	}
+
+	b_id = bmap(fd, inodes_x[fd].position);
+	bread(DISK, b_id, b);
+	memmove(buffer. b+inodes_x[fd].position, size);
+	inodes_x[fd].position += size;
+
+	return size;
 }
 
 /*
@@ -143,6 +224,24 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
 {
+	char b[BLOCK_SIZE];
+	int b_id;
+
+	if (inodes_x[fd].position+size > BLOCK_SIZE) {
+		size = BLOCK_SIZE - inodes_x[fd].position;
+	}
+
+	if (size =< 0) {
+		return -1;
+	}
+
+	b_id = bmap(fd, inodes_x[fd].position);
+	bread(DISK, b_id, b);
+	memmove(b+inodes_x[fd].position, buffer, size);
+	bwrite(DISK, b_id, b);
+	inodes_x[fd].position += size;
+
+	return size;
 	return -1;
 }
 
@@ -178,7 +277,7 @@ int checkFile(char *fileName)
 int ialloc(void) {
 	int i;
 	/* To search for a free inode */
-	for (i = 0; i < sblocks[0].numInodes; i++) {
+	for (i = 0; i < sblock.numInodes; i++) {
 		if (i_map[i] == 0) {
 			/* inode busy right now */
 			i_map[i] = 1;
@@ -195,13 +294,13 @@ int alloc(void) {
 	int i;
 	char buffer[BLOCK_SIZE];
 
-	for (i = 0; i < sblocks[0].dataBlockNum; i++) {
+	for (i = 0; i < sblock.dataBlockNum; i++) {
 		if (b_map[i] == 0) {
 			/* busy block right now */
 			b_map[i] = 1;
 			/* default values for the block */
 			memset(b, 0, BLOCK_SIZE);
-			bwrite(DISK, i+sblocks[0].firstDataBlock, b);
+			bwrite(DISK, i+sblock.firstDataBlock, b);
 			/* it returns the block id */
 			return i;
 		}
@@ -211,7 +310,7 @@ int alloc(void) {
 
 int ifree(int inode_id) {
 	/* to check the inode_id vality */
-	if (inode_id > sblocks[0].numInodes) {
+	if (inode_id > sblock.numInodes) {
 		return -1;
 	}
 
@@ -223,7 +322,7 @@ int ifree(int inode_id) {
 
 int free(int block_id) {
 	/* to check the inode_id vality */
-	if (block_id > sblocks[0].dataBlockNum) {
+	if (block_id > sblock.dataBlockNum) {
 		return -1;
 	}
 
@@ -236,7 +335,7 @@ int free(int block_id) {
 int namei(char *fname) {
 	int i;
 	/* seek for the inode with name <fname> */
-	for (i = 0; i < sblocks[0].numInodes; i++) {
+	for (i = 0; i < sblock.numInodes; i++) {
 		if (!strcmp(inodes[i].name, fname)) {
 			return i;
 		}
@@ -246,7 +345,7 @@ int namei(char *fname) {
 
 int bmap(int inode_id, int offset) {
 	/* check for if it is a valid inode ID */
-	if (inode_id > sblocks[0].numInodes) {
+	if (inode_id > sblock.numInodes) {
 		return -1;
 	}
 
@@ -258,181 +357,26 @@ int bmap(int inode_id, int offset) {
 	return -1;
 }
 
-int mount(void) {
-	int i;
-	/* Read disk block 1 and store it into sblocks[0] */
-	bread(DISK, 1, &(sblocks[0]));
-
-	/* Read from disk inode map */
-	for (i = 0; i < sblocks[0].inodeMapNumBlocks; i++) {
-		bread(DISK, 2+i, ((char *)i_map + i*BLOCK_SIZE));
-	}
-
-	/* Read disk block map */
-	for (i = 0; i < sblocks[0].dataMapNumBlock; i++) {
-		bread(DISK, 2+i+sblocks[0].inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE));
-	}
-
-	/* Read inodes from disk */
-	for (i = 0; i < (sblocks[0].numInodes*sizeof(inode_t)/BLOCK_SIZE); i++) {
-		bread(DISK, i+sblocks[0].firstInode, ((char *)inodes + i*BLOCK_SIZE));
-	}
-
-	return 1;
-}
 
 int sync(void) {
 	int i;
-	/* Write block 1 from sblocks[0] into disk */
-	bwrite(DISK, 1, &(sblocks[0]));
+	/* Write block 1 from sblock into disk */
+	bwrite(DISK, 1, &(sblock));
 
 	/* Write inode map to disk */
-	for (i = 0; i < sblocks[0].inodeMapNumBlocks; i++) {
+	for (i = 0; i < sblock.inodeMapNumBlocks; i++) {
 		bwrite(DISK, 2+i, ((char *)i_map + i*BLOCK_SIZE));
 	}
 
 	/* Write block map to disk */
-	for (i = 0; i < sblocks[0].dataMapNumBlock; i++) {
-		bwrite(DISK, 2+i+sblocks[0].inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE));
+	for (i = 0; i < sblock.dataMapNumBlock; i++) {
+		bwrite(DISK, 2+i+sblock.inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE));
 	}
 
 	/* Write inodes to disk */
-	for (i = 0; i < (sblocks[0].numInodes*sizeof(diskInodeType)/BLOCK_SIZE); i++) {
-		bwrite(DISK, i+sblocks[0].firstInode, ((char *)inodes + i*BLOCK_SIZE));
+	for (i = 0; i < (sblock.numInodes*sizeof(diskInodeType)/BLOCK_SIZE); i++) {
+		bwrite(DISK, i+sblock.firstInode, ((char *)inodes + i*BLOCK_SIZE));
 	}
 
 	return 1;
-}
-
-int unmount(void) {
-	int i;
-	/* make sure that all files are closed */
-	for (i = 0; i < sblocks[0].numInodes; i++) {
-		if (inodes_x[i].opened == 1) {
-			return -1;
-		}
-	}
-
-	/* flush metadata on disk */
-	sync();
-	return 0;
-}
-
-int mkfs(void) {
-	/* setup with default values the superblock, maps, and inodes */
-	sblocks[0].magicNum = 1234;
-	sblocks[0].numInodes = 50;
-
-	for (i = 0; i < sblocks[0].numInodes; i++) {
-		i_map[i] = 0; /* free */
-	}
-
-	for (i = 0; i < sblocks[0].dataBlockNum; i++) {
-		b_map[i] = 0; /* free */
-	}
-
-	for (i = 0; i < sblocks[0].numInodes; i++) {
-		memset(&(inodes[i]), 0, sizeof(diskInodeType));
-	}
-
-	/* to write the default file system into disk */
-	unmount();
-
-	return 0;
-}
-
-int open(char *name) {
-	int inode_id;
-
-	inode_id = namei(name);
-	if (inode_id < 0) {
-		return inode_id;
-	}
-
-	inodes_x[inode_id].position = 0;
-	inodes_x[inode_id].opened = 1;
-
-	return inode_id;
-}
-
-int close(int fd) {
-	if (fd < 0) {
-		return -1;
-	}
-
-	inodes_x[fd].position = 0;
-	inodes_x[fd].opened = 0;
-
-	return 0;
-}
-
-int creat(char *name) {
-	int b_id, inode_id;
-
-	inode_id = ialloc();
-	if(inode_id < 0) {return inode_id;}
-	b_id = alloc();
-	if(b_id < 0) {ifree(inode_id); return b_id;}
-
-	inodes[inode_id].type = 1; /* FILE */
-	strcpy(inodes[inode_id].name, name);
-	inodes[inode_id].directBlock = b_id;
-	inodes_x[inode_id].position = 0;
-	inodes_x[inode_id].opened = 1;
-
-	return 0;
-}
-
-int unlink(char *name) {
-	int inode_id;
-
-	inode_id = namei(name);
-	if (inode_id < 0) return -1;
-
-	free(inodes[inode_id].directBlock);
-	memset(&(inodes[inode_id]), 0, sizeof(diskInodeType));
-	ifree(inode_id);
-
-	return 0;
-}
-
-int read(int fd, char *buffer, int size) {
-	char b[BLOCK_SIZE];
-	int b_id;
-
-	if (inodes_x[fd].position+size > inodes[fd].size) {
-		size = inodes[fd].size - inodes_x[fd].position;
-	}
-
-	if (size =< 0) {
-		return -1;
-	}
-
-	b_id = bmap(fd, inodes_x[fd].position);
-	bread(DISK, b_id, b);
-	memmove(buffer. b+inodes_x[fd].position, size);
-	inodes_x[fd].position += size;
-
-	return size;
-}
-
-int write(int fd, char *buffer, int size) {
-	char b[BLOCK_SIZE];
-	int b_id;
-
-	if (inodes_x[fd].position+size > BLOCK_SIZE) {
-		size = BLOCK_SIZE - inodes_x[fd].position;
-	}
-
-	if (size =< 0) {
-		return -1;
-	}
-
-	b_id = bmap(fd, inodes_x[fd].position);
-	bread(DISK, b_id, b);
-	memmove(b+inodes_x[fd].position, buffer, size);
-	bwrite(DISK, b_id, b);
-	inodes_x[fd].position += size;
-
-	return size;
 }

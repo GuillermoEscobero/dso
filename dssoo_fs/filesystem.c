@@ -18,7 +18,60 @@
  */
 int mkFS(long deviceSize)
 {
-	return -1;
+	if (deviceSize < MIN_FILESYSTEM_SIZE) {
+		printf("ERROR: Disk too small\n");
+		return -1;
+	} else if (deviceSize > MAX_FILESYSTEM_SIZE) {
+		printf("ERROR: Disk too big\n");
+		return -1;
+	}
+
+	int fd;
+	fd = open(DISK_NAME, O_RDWR);
+
+	if (fd < 0) {
+		perror("Error: 'disk.dat' disk file not found");
+		return -1;
+	}
+
+	long dataBlockNum = (deviceSize-sizeof(superblock_t)
+		-(sizeof(char)*MAX_FILESYSTEM_OBJECTS_SUPPORTED*2)
+		-(sizeof(inode_t)*MAX_FILESYSTEM_OBJECTS_SUPPORTED))/BLOCK_SIZE;
+
+	long inodeBlocks = (MAX_FILESYSTEM_OBJECTS_SUPPORTED*sizeof(inode_t))/BLOCK_SIZE;
+
+	// sblock = (superblock_t*)malloc(sizeof(superblock_t));
+	sblock.magicNum 				 = MAGIC_NUMBER;
+	sblock.inodeMapNumBlocks = MAX_FILESYSTEM_OBJECTS_SUPPORTED;
+	sblock.dataMapNumBlock 	 = MAX_FILESYSTEM_OBJECTS_SUPPORTED;
+	sblock.numInodes 				 = MAX_FILESYSTEM_OBJECTS_SUPPORTED;
+	sblock.firstInode 			 = 1 + MAX_FILESYSTEM_OBJECTS_SUPPORTED + (unsigned int)dataBlockNum;
+	sblock.dataBlockNum 		 = (unsigned int)dataBlockNum;
+	sblock.firstDataBlock 	 = firstInode+MAX_FILESYSTEM_OBJECTS_SUPPORTED;
+	sblock.deviceSize 			 = deviceSize;
+	memset(sblock.padding, '0', sizeof(sblock->padding));
+
+	bwrite(DISK_NAME, 0, &sblock);
+
+	i_map = (char*)malloc(MAX_FILESYSTEM_OBJECTS_SUPPORTED*sizeof(char));
+
+	for (i = 0; i < sblock.numInodes; i++) {
+		i_map[i] = 0;
+	}
+
+	b_map = (char*)malloc(dataBlockNum*sizeof(char));
+
+	for (i = 0; i < sblock.dataBlockNum; i++) {
+		b_map[i] = 0;
+	}
+
+	for (i = 0; i < sblock.numInodes; i++) {
+		memset(&(inodes[i]), 0, sizeof(inode_t));
+	}
+
+	unmount();
+
+	return 0;
 }
 
 /*
@@ -122,208 +175,264 @@ int checkFile(char *fileName)
 }
 
 
-#define WELCOMEFILE_DATABLOCK_NUMBER (LAST_RESERVED_BLOCK + 1)
-#define WELCOMEFILE_INODE_NUMBER (LAST_RESERVED_INODE + 1)
-
-static inline struct super_block *SB(struct super_block *sb) {
-        return sb->s_fs_info;
+int ialloc(void) {
+	int i;
+	/* To search for a free inode */
+	for (i = 0; i < sblocks[0].numInodes; i++) {
+		if (i_map[i] == 0) {
+			/* inode busy right now */
+			i_map[i] = 1;
+			/* Default values for the inode */
+			memset(&(inodes[i]), 0, sizeof(inode_t));
+			/* Return the inode identification */
+			return i;
+		}
+	}
+	return -1;
 }
 
-static inline struct inode *INODE(struct inode *inode) {
-        return inode->i_private;
+int alloc(void) {
+	int i;
+	char buffer[BLOCK_SIZE];
+
+	for (i = 0; i < sblocks[0].dataBlockNum; i++) {
+		if (b_map[i] == 0) {
+			/* busy block right now */
+			b_map[i] = 1;
+			/* default values for the block */
+			memset(b, 0, BLOCK_SIZE);
+			bwrite(DISK, i+sblocks[0].firstDataBlock, b);
+			/* it returns the block id */
+			return i;
+		}
+	}
+	return -1;
 }
 
-struct inode *get_inode(struct super_block *sb, const struct inode *dir,
-                        umode_t mode, dev_t dev) {
-        struct inode *inode = new_inode(sb);
+int ifree(int inode_id) {
+	/* to check the inode_id vality */
+	if (inode_id > sblocks[0].numInodes) {
+		return -1;
+	}
 
-        if(inode) {
-                inode->inode_no = get_next_ino();
-                inode_init_owner(inode, dir, mode);
-                inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+	/* free inode */
+	i_map[inode_id] = 0;
 
-                switch (mode & S_IFMT) {
-                case S_IFDIR:
-                        inc_nlink(inode);
-                        break;
-                case S_IFREG:
-                case S_IFLNK:
-                default:
-                        printk(KERN_ERR "error\n");
-                        return NULL;
-                        break;
-                }
-        }
-        return inode;
+	return 0;
 }
 
-static int write_superblock(int fd) {
-        struct super_block sb = {
-                .version = 1,
-                .magic = MAGIC;
-                .block_size = BLOCK_SIZE;
-                .inodes_count = WELCOMEFILE_INODE_NUMBER,
-                .free_blocks = (~0) & ~(1 << LAST_RESERVED_BLOCK);
-        }
-        ssize_t ret;
+int free(int block_id) {
+	/* to check the inode_id vality */
+	if (block_id > sblocks[0].dataBlockNum) {
+		return -1;
+	}
 
-        ret = write(fd, &sb, sizeof(sb));
-        if (ret != BLOCK_SIZE) {
-                printf("bytes written [%d] are not equal to the default block size\n", (int)ret);
-                return -1;
-        }
+	/* free inode */
+	b_map[block_id] = 0;
 
-        printf("Super block written successfully\n");
-        return 0;
+	return 0;
 }
 
-static int write_root_inode(int fd) {
-        ssize_t ret;
-
-        struct inode root_inode;
-
-        root_inode.mode = S_IFDIR;
-        root_inode.inode_no = ROOTDIR_INODE_NUMBER;
-        root_inode.data_block_number = ROOTDIR_DATABLOCK_NUMBER;
-        root_inode.dir_children_count = 1;
-
-        ret = write(fd, &root_inode, sizeof(root_inode));
-
-        if (ret != sizeof(root_inode)) {
-                printf("The inode store was not written properly. Retry your mkfs\n");
-                return -1;
-        }
-
-        printf("root directory inode written successfully\n");
-
-        return 0;
+int namei(char *fname) {
+	int i;
+	/* seek for the inode with name <fname> */
+	for (i = 0; i < sblocks[0].numInodes; i++) {
+		if (!strcmp(inodes[i].name, fname)) {
+			return i;
+		}
+	}
+	return -1;
 }
 
-static int write_journal_inode(int fd) {
-        ssize_t ret;
-        struct inode journal;
+int bmap(int inode_id, int offset) {
+	/* check for if it is a valid inode ID */
+	if (inode_id > sblocks[0].numInodes) {
+		return -1;
+	}
 
-        journal.inode_no = JOURNAL_INODE_NUMBER;
-        journal.data_block_number = JOURNAL_BLOCK_NUMBER;
+	/* return the inode block */
+	if (offset < BLOCK_SIZE) {
+		return inodes[inode_id].directBlock;
+	}
 
-        ret = write(fd, &journal, sizeof(journal));
-
-        if (ret != sizeof(journal)) {
-                printf("Error while writing journal inode. Retry your mkfs\n");
-                return -1;
-        }
-
-        printf("journal inode written successfully\n");
-        return 0;
+	return -1;
 }
 
-static int write_welcome_inode(int fd, const struct inode *i) {
-        off_t nbytes;
-        ssize_t ret;
+int mount(void) {
+	int i;
+	/* Read disk block 1 and store it into sblocks[0] */
+	bread(DISK, 1, &(sblocks[0]));
 
-        ret = write(fd, i, sizeof(*i));
-        if (ret != sizeof(*i)) {
-                printf("The welcomefile inode was not written properly. Retry your mkfs\n");
-                return -1;
-        }
-        printf("welcome inode written successfully\n");
+	/* Read from disk inode map */
+	for (i = 0; i < sblocks[0].inodeMapNumBlocks; i++) {
+		bread(DISK, 2+i, ((char *)i_map + i*BLOCK_SIZE));
+	}
 
-        nbytes = BLOCK_SIZE - (sizeof(*i) * 3);
-        ret = lseek(fd, nbytes, SEEK_CUR);
-        if (ret == (off_t)-1) {
-                printf("The padding bytes are not written properly. Retry your mkfs\n");
-                return -1;
-        }
-        printf("inode store padding bytes (after the three inodes) written sucessfully\n");
-        return 0;
+	/* Read disk block map */
+	for (i = 0; i < sblocks[0].dataMapNumBlock; i++) {
+		bread(DISK, 2+i+sblocks[0].inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE));
+	}
+
+	/* Read inodes from disk */
+	for (i = 0; i < (sblocks[0].numInodes*sizeof(inode_t)/BLOCK_SIZE); i++) {
+		bread(DISK, i+sblocks[0].firstInode, ((char *)inodes + i*BLOCK_SIZE));
+	}
+
+	return 1;
 }
 
-int write_journal(int fd) {
-        ssize_t ret;
-        ret = lseek(fd, BLOCK_SIZE*JOURNAL_BLOCKS, SEEK_CUR);
-        if (ret == (off_t) -1) {
-                printf("Can't write journal. Retry mkfs\n");
-        }
+int sync(void) {
+	int i;
+	/* Write block 1 from sblocks[0] into disk */
+	bwrite(DISK, 1, &(sblocks[0]));
+
+	/* Write inode map to disk */
+	for (i = 0; i < sblocks[0].inodeMapNumBlocks; i++) {
+		bwrite(DISK, 2+i, ((char *)i_map + i*BLOCK_SIZE));
+	}
+
+	/* Write block map to disk */
+	for (i = 0; i < sblocks[0].dataMapNumBlock; i++) {
+		bwrite(DISK, 2+i+sblocks[0].inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE));
+	}
+
+	/* Write inodes to disk */
+	for (i = 0; i < (sblocks[0].numInodes*sizeof(diskInodeType)/BLOCK_SIZE); i++) {
+		bwrite(DISK, i+sblocks[0].firstInode, ((char *)inodes + i*BLOCK_SIZE));
+	}
+
+	return 1;
 }
 
-int write_dirent(int fd, const struct dir_record *record) {
-        ssize_t nbytes = sizeof(*record), ret;
+int unmount(void) {
+	int i;
+	/* make sure that all files are closed */
+	for (i = 0; i < sblocks[0].numInodes; i++) {
+		if (inodes_x[i].opened == 1) {
+			return -1;
+		}
+	}
 
-        ret = write(fd, record, nbytes);
-        if (ret != nbytes) {
-                printf("Writing the rootdirectory datablock (name+inode_no pair for welcome) has failed\n");
-                return -1;
-        }
-        printf("padding after the rootdirectory children written successfully\n");
-        return 0;
+	/* flush metadata on disk */
+	sync();
+	return 0;
 }
 
-int write_block(int fd, char *block, size_t len) {
-        ssize_t ret;
-        ret = write(fd, block, len);
-        if (ret != len) {
-                printf("Writing file body has failed\n");
-                return -1;
-        }
-        printf("block has been written successfully\n");
-        return 0;
+int mkfs(void) {
+	/* setup with default values the superblock, maps, and inodes */
+	sblocks[0].magicNum = 1234;
+	sblocks[0].numInodes = 50;
+
+	for (i = 0; i < sblocks[0].numInodes; i++) {
+		i_map[i] = 0; /* free */
+	}
+
+	for (i = 0; i < sblocks[0].dataBlockNum; i++) {
+		b_map[i] = 0; /* free */
+	}
+
+	for (i = 0; i < sblocks[0].numInodes; i++) {
+		memset(&(inodes[i]), 0, sizeof(diskInodeType));
+	}
+
+	/* to write the default file system into disk */
+	unmount();
+
+	return 0;
 }
 
-int main(int argc, char const *argv[]) {
-        int fd;
-        ssize_t ret;
+int open(char *name) {
+	int inode_id;
 
-        char welcomefile_body[] = "Esto es para testear cosas.\n";
-        struct inode welcome = {
-                .mode = S_IFREG,
-                .inode_no = WELCOMEFILE_INODE_NUMBER,
-                .data_block_number = WELCOMEFILE_DATABLOCK_NUMBER,
-                .file_size = sizeof(welcomefile_body),
-        };
-        struct dir_record record = {
-                .filename = "vakanno",
-                .inode_no = WELCOMEFILE_INODE_NUMBER,
-        };
+	inode_id = namei(name);
+	if (inode_id < 0) {
+		return inode_id;
+	}
 
-        if (argc != 2) {
-                printf("Usage: mkfs-simplefs <device>\n");
-                return -1;
-        }
+	inodes_x[inode_id].position = 0;
+	inodes_x[inode_id].opened = 1;
 
-        fd = open(argv[1], O_RDWR);
-        if (fd == -1) {
-                perror("Error opening the device");
-                return -1;
-        }
+	return inode_id;
+}
 
-        ret = 1;
+int close(int fd) {
+	if (fd < 0) {
+		return -1;
+	}
 
-        do {
-                if (write_superblock(fd)) {
-                        break;
-                }
-                if (write_root_inode(fd)) {
-                        break;
-                }
-                if (write_journal_inode(fd)) {
-                        break;
-                }
-                if (write_welcome_inode(fd, &welcome)) {
-                        break;
-                }
-                if (write_journal(fd)) {
-                        break;
-                }
-                if (write_dirent(fd, &record)) {
-                        break;
-                }
-                if (write_block(fd, welcomefile_body, welcome.file_size)) {
-                        break;
-                }
-                ret = 0;
+	inodes_x[fd].position = 0;
+	inodes_x[fd].opened = 0;
 
-        } while(0);
+	return 0;
+}
 
-        close(fd);
-        return ret;
+int creat(char *name) {
+	int b_id, inode_id;
+
+	inode_id = ialloc();
+	if(inode_id < 0) {return inode_id;}
+	b_id = alloc();
+	if(b_id < 0) {ifree(inode_id); return b_id;}
+
+	inodes[inode_id].type = 1; /* FILE */
+	strcpy(inodes[inode_id].name, name);
+	inodes[inode_id].directBlock = b_id;
+	inodes_x[inode_id].position = 0;
+	inodes_x[inode_id].opened = 1;
+
+	return 0;
+}
+
+int unlink(char *name) {
+	int inode_id;
+
+	inode_id = namei(name);
+	if (inode_id < 0) return -1;
+
+	free(inodes[inode_id].directBlock);
+	memset(&(inodes[inode_id]), 0, sizeof(diskInodeType));
+	ifree(inode_id);
+
+	return 0;
+}
+
+int read(int fd, char *buffer, int size) {
+	char b[BLOCK_SIZE];
+	int b_id;
+
+	if (inodes_x[fd].position+size > inodes[fd].size) {
+		size = inodes[fd].size - inodes_x[fd].position;
+	}
+
+	if (size =< 0) {
+		return -1;
+	}
+
+	b_id = bmap(fd, inodes_x[fd].position);
+	bread(DISK, b_id, b);
+	memmove(buffer. b+inodes_x[fd].position, size);
+	inodes_x[fd].position += size;
+
+	return size;
+}
+
+int write(int fd, char *buffer, int size) {
+	char b[BLOCK_SIZE];
+	int b_id;
+
+	if (inodes_x[fd].position+size > BLOCK_SIZE) {
+		size = BLOCK_SIZE - inodes_x[fd].position;
+	}
+
+	if (size =< 0) {
+		return -1;
+	}
+
+	b_id = bmap(fd, inodes_x[fd].position);
+	bread(DISK, b_id, b);
+	memmove(b+inodes_x[fd].position, buffer, size);
+	bwrite(DISK, b_id, b);
+	inodes_x[fd].position += size;
+
+	return size;
 }

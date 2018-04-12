@@ -44,7 +44,7 @@ int main() {
 
 	///////
 
-	ret = createFile("test.txt");
+	//ret = createFile("test.txt");
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 		return -1;

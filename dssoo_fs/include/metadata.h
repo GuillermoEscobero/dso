@@ -59,16 +59,6 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 #define MIN_FILESYSTEM_SIZE 51200
 #define MAX_FILESYSTEM_SIZE 52428800
 
-superblock_t sblock;
-char *i_map;   /* numInodes */
-char *b_map;   /* dataBlockNum */
-inode_t inodes[MAX_FILESYSTEM_OBJECTS_SUPPORTED];
-
-struct {
-  int position;
-  int opened;
-} inodes_x[MAX_FILESYSTEM_OBJECTS_SUPPORTED];
-
 typedef struct {
   unsigned int magicNum;              /* Magic number of the superblock: 0x000D5500 */
   unsigned int inodeMapNumBlocks;     /* Number of blocks of the i-node map */
@@ -83,8 +73,19 @@ typedef struct {
 
 typedef struct {
   char name[FILENAME_MAXLEN];
-  unsigned int inodesContent[200];
+  unsigned int directBlocks[12];
+  unsigned int undirectBlock;
   unsigned int size;
-  unsigned int directBlock;
-  char padding[BLOCK_SIZE-844];
+  //char padding[BLOCK_SIZE-844];
 } inode_t;
+
+superblock_t sblock;
+char *i_map;   /* numInodes */
+char *b_map;   /* dataBlockNum */
+inode_t inodes[MAX_FILESYSTEM_OBJECTS_SUPPORTED];
+
+struct {
+  int position;
+  int opened;
+} inodes_x[MAX_FILESYSTEM_OBJECTS_SUPPORTED];
+

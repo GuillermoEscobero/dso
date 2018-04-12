@@ -11,6 +11,7 @@
 #include "include/metadata.h"		// Type and structure declaration of the file system
 #include "include/crc.h"			// Headers for the CRC functionality
 
+#include <math.h>
 
 /*
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
@@ -26,6 +27,7 @@ int mkFS(long deviceSize)
 		return -1;
 	}
 
+    int i;
 	int fd;
 	fd = open(DISK_NAME, O_RDWR);
 
@@ -34,41 +36,61 @@ int mkFS(long deviceSize)
 		return -1;
 	}
 
-	long dataBlockNum = (deviceSize-sizeof(superblock_t)
-		-(sizeof(char)*MAX_FILESYSTEM_OBJECTS_SUPPORTED*2)
-		-(sizeof(inode_t)*MAX_FILESYSTEM_OBJECTS_SUPPORTED))/BLOCK_SIZE;
+    unsigned int deviceBlocks = floor(deviceSize/BLOCK_SIZE);
+    printf("deviceBlocks = %u\n", deviceBlocks);
+    
+    // unsigned int inodeBlocks = (unsigned int)ceil((MAX_FILESYSTEM_OBJECTS_SUPPORTED*sizeof(inode_t))/BLOCK_SIZE);
+    unsigned int inodeBlocks = 1;
+    printf("Blocks for inodes = %u\n", inodeBlocks);
 
-	long inodeBlocks = (MAX_FILESYSTEM_OBJECTS_SUPPORTED*sizeof(inode_t))/BLOCK_SIZE;
+    // unsigned int inodeMapBlocks = (unsigned int)ceil((MAX_FILESYSTEM_OBJECTS_SUPPORTED*(unsigned int)sizeof(char))/BLOCK_SIZE);
+    unsigned int inodeMapBlocks = 1;
+    printf("inodeMapBlocks = %u\n", inodeMapBlocks);
+    
+    // unsigned int dataMapBlocks = ceil(deviceBlocks*sizeof(char)/BLOCK_SIZE);
+    unsigned int dataMapBlocks = 1;
+    printf("dataMapBlocks = %u\n", dataMapBlocks);
 
-	sblock.magicNum 				 = MAGIC_NUMBER;
-	sblock.inodeMapNumBlocks = MAX_FILESYSTEM_OBJECTS_SUPPORTED;
-	sblock.dataMapNumBlock 	 = MAX_FILESYSTEM_OBJECTS_SUPPORTED;
-	sblock.numInodes 				 = MAX_FILESYSTEM_OBJECTS_SUPPORTED;
-	sblock.firstInode 			 = 1 + MAX_FILESYSTEM_OBJECTS_SUPPORTED + (unsigned int)dataBlockNum;
-	sblock.dataBlockNum 		 = (unsigned int)dataBlockNum;
-	sblock.firstDataBlock 	 = firstInode+MAX_FILESYSTEM_OBJECTS_SUPPORTED;
-	sblock.deviceSize 			 = deviceSize;
-	memset(sblock.padding, '0', sizeof(sblock->padding));
+	unsigned int dataBlockNum = deviceBlocks - 1 - inodeMapBlocks - dataMapBlocks - inodeBlocks; 
+    if(dataBlockNum < 0) {
+        printf("ERROR no data blocks\n");
+        return -1;
+    } else {
+        printf("dataBlockNum = %d\n", dataBlockNum);
+    }
 
-	bwrite(DISK_NAME, 0, &sblock);
+	sblock.magicNum 		 = MAGIC_NUMBER;
+	sblock.inodeMapNumBlocks = inodeMapBlocks;
+	sblock.dataMapNumBlock 	 = dataMapBlocks;
+	sblock.numInodes 		 = MAX_FILESYSTEM_OBJECTS_SUPPORTED;
+	sblock.firstInode 		 = 1 + inodeMapBlocks + dataMapBlocks;
+	sblock.dataBlockNum 	 = dataBlockNum;
+	sblock.firstDataBlock 	 = 1 + inodeMapBlocks + dataMapBlocks + inodeBlocks;
+	sblock.deviceSize 		 = deviceSize;
+	memset(sblock.padding, '0', sizeof(sblock.padding));
+
+	bwrite(DISK_NAME, 0, (char*)&sblock);
 
 	i_map = (char*)malloc(MAX_FILESYSTEM_OBJECTS_SUPPORTED*sizeof(char));
 
 	for (i = 0; i < sblock.numInodes; i++) {
-		i_map[i] = 0;
+		printf("Initializing i_map[%d]\n", i);
+        i_map[i] = 0;
 	}
 
 	b_map = (char*)malloc(dataBlockNum*sizeof(char));
 
 	for (i = 0; i < sblock.dataBlockNum; i++) {
-		b_map[i] = 0;
+		printf("Initializing b_map[%d]\n", i);
+        b_map[i] = 0;
 	}
 
 	for (i = 0; i < sblock.numInodes; i++) {
+		printf("Initializing inodes[%d]\n", i);
 		memset(&(inodes[i]), 0, sizeof(inode_t));
 	}
 
-	unmount();
+	unmountFS();
 
 	return 0;
 }
@@ -81,24 +103,24 @@ int mountFS(void)
 {
 	int i;
 	/* Read disk block 1 and store it into sblock */
-	bread(DISK, 1, &(sblock));
+	bread(DISK_NAME, 0, (char*)&(sblock));
 
 	/* Read from disk inode map */
 	for (i = 0; i < sblock.inodeMapNumBlocks; i++) {
-		bread(DISK, 2+i, ((char *)i_map + i*BLOCK_SIZE));
+		bread(DISK_NAME, 1+i, ((char *)i_map + i*BLOCK_SIZE));
 	}
 
 	/* Read disk block map */
 	for (i = 0; i < sblock.dataMapNumBlock; i++) {
-		bread(DISK, 2+i+sblock.inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE));
+		bread(DISK_NAME, 1+i+sblock.inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE));
 	}
 
 	/* Read inodes from disk */
 	for (i = 0; i < (sblock.numInodes*sizeof(inode_t)/BLOCK_SIZE); i++) {
-		bread(DISK, i+sblock.firstInode, ((char *)inodes + i*BLOCK_SIZE));
+		bread(DISK_NAME, i+sblock.firstInode, ((char *)inodes + i*BLOCK_SIZE));
 	}
 
-	return 1;
+	return 0;
 }
 
 /*
@@ -114,7 +136,7 @@ int unmountFS(void)
 		}
 	}
 
-	sync();
+	fssync();
 	return 0;
 }
 
@@ -124,16 +146,19 @@ int unmountFS(void)
  */
 int createFile(char *fileName)
 {
-	int b_id, inode_id;
+	if(fileName == NULL) {return -2;}           /* Error with file name*/
+    if(fileexists(fileName) == 1) {return -1;}  /* File name already exists */
+
+    int b_id, inode_id;
 
 	inode_id = ialloc();
 	if(inode_id < 0) {return inode_id;}
 	b_id = alloc();
 	if(b_id < 0) {ifree(inode_id); return b_id;}
 
-	inodes[inode_id].type = 1; /* FILE */
-	strcpy(inodes[inode_id].name, name);
-	inodes[inode_id].directBlock = b_id;
+	strcpy(inodes[inode_id].name, fileName);
+	inodes[inode_id].undirectBlock = b_id;
+
 	inodes_x[inode_id].position = 0;
 	inodes_x[inode_id].opened = 1;
 
@@ -148,11 +173,11 @@ int removeFile(char *fileName)
 {
 	int inode_id;
 
-	inode_id = namei(name);
+	inode_id = namei(fileName);
 	if (inode_id < 0) return -1;
 
-	free(inodes[inode_id].directBlock);
-	memset(&(inodes[inode_id]), 0, sizeof(diskInodeType));
+	bfree(inodes[inode_id].undirectBlock);
+	memset(&(inodes[inode_id]), 0, sizeof(inode_t));
 	ifree(inode_id);
 
 	return 0;
@@ -166,7 +191,7 @@ int openFile(char *fileName)
 {
 	int inode_id;
 
-	inode_id = namei(name);
+	inode_id = namei(fileName);
 	if (inode_id < 0) {
 		return inode_id;
 	}
@@ -183,12 +208,12 @@ int openFile(char *fileName)
  */
 int closeFile(int fileDescriptor)
 {
-	if (fd < 0) {
+	if (fileDescriptor < 0) {
 		return -1;
 	}
 
-	inodes_x[fd].position = 0;
-	inodes_x[fd].opened = 0;
+	inodes_x[fileDescriptor].position = 0;
+	inodes_x[fileDescriptor].opened = 0;
 
 	return 0;
 }
@@ -197,54 +222,56 @@ int closeFile(int fileDescriptor)
  * @brief	Reads a number of bytes from a file and stores them in a buffer.
  * @return	Number of bytes properly read, -1 in case of error.
  */
+/*
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
 	char b[BLOCK_SIZE];
 	int b_id;
 
-	if (inodes_x[fd].position+size > inodes[fd].size) {
-		size = inodes[fd].size - inodes_x[fd].position;
+	if (inodes_x[fileDescriptor].position+numBytes > inodes[fileDescriptor].size) {
+		numBytes = inodes[fileDescriptor].size - inodes_x[fileDescriptor].position;
 	}
 
-	if (size =< 0) {
+	if (numBytes <= 0) {
 		return -1;
 	}
 
-	b_id = bmap(fd, inodes_x[fd].position);
-	bread(DISK, b_id, b);
-	memmove(buffer. b+inodes_x[fd].position, size);
-	inodes_x[fd].position += size;
+	b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
+	bread(DISK_NAME, b_id, b);
+	memmove(buffer, b+inodes_x[fileDescriptor].position, numBytes);
+	inodes_x[fileDescriptor].position += numBytes;
 
-	return size;
+	return numBytes;
 }
+*/
 
 /*
  * @brief	Writes a number of bytes from a buffer and into a file.
  * @return	Number of bytes properly written, -1 in case of error.
  */
+/*
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
 {
 	char b[BLOCK_SIZE];
 	int b_id;
 
-	if (inodes_x[fd].position+size > BLOCK_SIZE) {
-		size = BLOCK_SIZE - inodes_x[fd].position;
+	if (inodes_x[fileDescriptor].position+numBytes > BLOCK_SIZE) {
+		numBytes = BLOCK_SIZE - inodes_x[fileDescriptor].position;
 	}
 
-	if (size =< 0) {
+	if (numBytes <= 0) {
 		return -1;
 	}
 
-	b_id = bmap(fd, inodes_x[fd].position);
-	bread(DISK, b_id, b);
-	memmove(b+inodes_x[fd].position, buffer, size);
-	bwrite(DISK, b_id, b);
-	inodes_x[fd].position += size;
+	b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
+	bread(DISK_NAME, b_id, b);
+	memmove(b+inodes_x[fileDescriptor].position, buffer, numBytes);
+	bwrite(DISK_NAME, b_id, b);
+	inodes_x[fileDescriptor].position += numBytes;
 
-	return size;
-	return -1;
+	return numBytes;
 }
-
+*/
 
 /*
  * @brief	Modifies the position of the seek pointer of a file.
@@ -299,8 +326,8 @@ int alloc(void) {
 			/* busy block right now */
 			b_map[i] = 1;
 			/* default values for the block */
-			memset(b, 0, BLOCK_SIZE);
-			bwrite(DISK, i+sblock.firstDataBlock, b);
+			memset(buffer, 0, BLOCK_SIZE);
+			bwrite(DISK_NAME, i+sblock.firstDataBlock, buffer);
 			/* it returns the block id */
 			return i;
 		}
@@ -320,7 +347,7 @@ int ifree(int inode_id) {
 	return 0;
 }
 
-int free(int block_id) {
+int bfree(int block_id) {
 	/* to check the inode_id vality */
 	if (block_id > sblock.dataBlockNum) {
 		return -1;
@@ -342,41 +369,53 @@ int namei(char *fname) {
 	}
 	return -1;
 }
-
+/*
 int bmap(int inode_id, int offset) {
-	/* check for if it is a valid inode ID */
-	if (inode_id > sblock.numInodes) {
-		return -1;
-	}
+	// check for if it is a valid inode ID */
+//	if (inode_id > sblock.numInodes) {
+//		return -1;
+//	}
+//
+//	/* return the inode block */
+//	if (offset < BLOCK_SIZE) {
+//		return inodes[inode_id].directBlock;
+//	}
+//
+//	return -1;
+//}
 
-	/* return the inode block */
-	if (offset < BLOCK_SIZE) {
-		return inodes[inode_id].directBlock;
-	}
 
-	return -1;
-}
-
-
-int sync(void) {
+int fssync(void) {
 	int i;
 	/* Write block 1 from sblock into disk */
-	bwrite(DISK, 1, &(sblock));
+	bwrite(DISK_NAME, 0, (char*)&sblock);
 
 	/* Write inode map to disk */
 	for (i = 0; i < sblock.inodeMapNumBlocks; i++) {
-		bwrite(DISK, 2+i, ((char *)i_map + i*BLOCK_SIZE));
+		bwrite(DISK_NAME, 1+i, ((char *)i_map + i*BLOCK_SIZE));
 	}
 
 	/* Write block map to disk */
 	for (i = 0; i < sblock.dataMapNumBlock; i++) {
-		bwrite(DISK, 2+i+sblock.inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE));
+		bwrite(DISK_NAME, 1+i+sblock.inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE));
 	}
 
 	/* Write inodes to disk */
-	for (i = 0; i < (sblock.numInodes*sizeof(diskInodeType)/BLOCK_SIZE); i++) {
-		bwrite(DISK, i+sblock.firstInode, ((char *)inodes + i*BLOCK_SIZE));
+	for (i = 0; i < (sblock.numInodes*sizeof(inode_t)/BLOCK_SIZE); i++) {
+		bwrite(DISK_NAME, i+sblock.firstInode, ((char *)inodes + i*BLOCK_SIZE));
 	}
 
 	return 1;
+}
+
+int fileexists(char *filename) {
+    int i;
+
+    for (i = 0; i < sblock.numInodes; i++) {
+        if((i_map[i] == 0) && (strcmp(inodes[i].name, filename) == 0)) {
+            return 1;
+        }
+    }
+
+    return 0;
 }

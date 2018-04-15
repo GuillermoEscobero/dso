@@ -73,11 +73,14 @@ typedef struct {
 
 typedef struct {
   char name[FILENAME_MAXLEN];
-  unsigned int directBlocks[12];
+  //unsigned int directBlocks[12];
   unsigned int undirectBlock;
   unsigned int size;
-  //char padding[BLOCK_SIZE-844];
 } inode_t;
+
+typedef struct {
+    unsigned int dataBlocks[512];
+} undirectBlock;
 
 superblock_t sblock;
 char *i_map;   /* numInodes */

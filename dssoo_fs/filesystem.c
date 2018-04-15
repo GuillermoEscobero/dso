@@ -29,7 +29,7 @@ int mkFS(long deviceSize)
 
     int i;
 	int fd;
-	fd = open(DISK_NAME, O_RDWR);
+	fd = open(DEVICE_IMAGE, O_RDWR);
 
 	if (fd < 0) {
 		perror("Error: 'disk.dat' disk file not found");
@@ -69,7 +69,7 @@ int mkFS(long deviceSize)
 	sblock.deviceSize 		 = deviceSize;
 	memset(sblock.padding, '0', sizeof(sblock.padding));
 
-	bwrite(DISK_NAME, 0, (char*)&sblock);
+	bwrite(DEVICE_IMAGE, 0, (char*)&sblock);
 
 	i_map = (char*)malloc(MAX_FILESYSTEM_OBJECTS_SUPPORTED*sizeof(char));
 
@@ -103,21 +103,21 @@ int mountFS(void)
 {
 	int i;
 	/* Read disk block 1 and store it into sblock */
-	bread(DISK_NAME, 0, (char*)&(sblock));
+	bread(DEVICE_IMAGE, 0, (char*)&(sblock));
 
 	/* Read from disk inode map */
 	for (i = 0; i < sblock.inodeMapNumBlocks; i++) {
-		bread(DISK_NAME, 1+i, ((char *)i_map + i*BLOCK_SIZE));
+		bread(DEVICE_IMAGE, 1+i, ((char *)i_map + i*BLOCK_SIZE));
 	}
 
 	/* Read disk block map */
 	for (i = 0; i < sblock.dataMapNumBlock; i++) {
-		bread(DISK_NAME, 1+i+sblock.inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE));
+		bread(DEVICE_IMAGE, 1+i+sblock.inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE));
 	}
 
 	/* Read inodes from disk */
 	for (i = 0; i < (sblock.numInodes*sizeof(inode_t)/BLOCK_SIZE); i++) {
-		bread(DISK_NAME, i+sblock.firstInode, ((char *)inodes + i*BLOCK_SIZE));
+		bread(DEVICE_IMAGE, i+sblock.firstInode, ((char *)inodes + i*BLOCK_SIZE));
 	}
 
 	return 0;
@@ -132,6 +132,7 @@ int unmountFS(void)
 	int i;
 	for (i = 0; i < sblock.numInodes; i++) {
 		if(inodes_x[i].opened == 1) {
+            fprintf(stderr, "Error in unmountFS, file %s still opened\n", inodes[i].name);
 			return -1;
 		}
 	}
@@ -146,16 +147,28 @@ int unmountFS(void)
  */
 int createFile(char *fileName)
 {
-	if(fileName == NULL) {return -2;}           /* Error with file name*/
-    if(fileexists(fileName) == 1) {return -1;}  /* File name already exists */
+	printf("CREATEFILE *******************\n");
 
-    int b_id, inode_id;
+    if(fileName == NULL) {return -2;}       /* Error with file name*/
 
+    if(namei(fileName) != -1) {
+        fprintf(stderr, "Error in createFile: %s already exists\n", fileName);
+        return -1;
+    }  /* File name already exists */
+
+    unsigned int b_id, inode_id;
+
+    /* Allocate an inode for the new file */
 	inode_id = ialloc();
-	if(inode_id < 0) {return inode_id;}
-	b_id = alloc();
+	printf("inode_id = %u\n", inode_id);
+    if(inode_id < 0) {return inode_id;}
+	
+    /* Allocate indirect block */
+    b_id = alloc();
+	printf("b_id = %u\n", b_id);
 	if(b_id < 0) {ifree(inode_id); return b_id;}
 
+    memset(inodes[inode_id].name, '\0', sizeof(FILENAME_MAXLEN));
 	strcpy(inodes[inode_id].name, fileName);
 	inodes[inode_id].undirectBlock = b_id;
 
@@ -175,6 +188,25 @@ int removeFile(char *fileName)
 
 	inode_id = namei(fileName);
 	if (inode_id < 0) return -1;
+
+    unsigned int size = inodes[inode_id].size;
+    unsigned int undirectBlock_id = inodes[inode_id].undirectBlock;
+
+    int i = 0;
+    char *buf = (char*)malloc(sizeof(undirectBlock));
+    undirectBlock u_block;
+
+    bread(DEVICE_IMAGE, undirectBlock_id, buf);
+    memmove(&u_block, buf, BLOCK_SIZE);
+
+    free(buf);
+    
+    do {
+        bfree(u_block.dataBlocks[i]);
+
+        i++;
+        size -= BLOCK_SIZE;
+    } while(size > BLOCK_SIZE);
 
 	bfree(inodes[inode_id].undirectBlock);
 	memset(&(inodes[inode_id]), 0, sizeof(inode_t));
@@ -237,7 +269,7 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 	}
 
 	b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
-	bread(DISK_NAME, b_id, b);
+	bread(DEVICE_IMAGE, b_id, b);
 	memmove(buffer, b+inodes_x[fileDescriptor].position, numBytes);
 	inodes_x[fileDescriptor].position += numBytes;
 
@@ -264,9 +296,9 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	}
 
 	b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
-	bread(DISK_NAME, b_id, b);
+	bread(DEVICE_IMAGE, b_id, b);
 	memmove(b+inodes_x[fileDescriptor].position, buffer, numBytes);
-	bwrite(DISK_NAME, b_id, b);
+	bwrite(DEVICE_IMAGE, b_id, b);
 	inodes_x[fileDescriptor].position += numBytes;
 
 	return numBytes;
@@ -327,7 +359,7 @@ int alloc(void) {
 			b_map[i] = 1;
 			/* default values for the block */
 			memset(buffer, 0, BLOCK_SIZE);
-			bwrite(DISK_NAME, i+sblock.firstDataBlock, buffer);
+			bwrite(DEVICE_IMAGE, i+sblock.firstDataBlock, buffer);
 			/* it returns the block id */
 			return i;
 		}
@@ -369,53 +401,49 @@ int namei(char *fname) {
 	}
 	return -1;
 }
-/*
+
 int bmap(int inode_id, int offset) {
-	// check for if it is a valid inode ID */
-//	if (inode_id > sblock.numInodes) {
-//		return -1;
-//	}
-//
-//	/* return the inode block */
-//	if (offset < BLOCK_SIZE) {
-//		return inodes[inode_id].directBlock;
-//	}
-//
-//	return -1;
-//}
+	/* check for if it is a valid inode ID */
+	if (inode_id > sblock.numInodes) {
+		return -1;
+	}
+
+    /* Este condicional esta bien si metemos algo para files pequeñas para optimizar*/
+	// if (offset < BLOCK_SIZE) {
+	//  	return inodes[inode_id].directBlock;
+	// }
+
+    int block = 0;
+    while(offset > BLOCK_SIZE) {
+        offset -= BLOCK_SIZE;
+        block++;
+    }
+
+
+	return block;
+}
 
 
 int fssync(void) {
 	int i;
 	/* Write block 1 from sblock into disk */
-	bwrite(DISK_NAME, 0, (char*)&sblock);
+	bwrite(DEVICE_IMAGE, 0, (char*)&sblock);
 
 	/* Write inode map to disk */
 	for (i = 0; i < sblock.inodeMapNumBlocks; i++) {
-		bwrite(DISK_NAME, 1+i, ((char *)i_map + i*BLOCK_SIZE));
+		bwrite(DEVICE_IMAGE, 1+i, ((char *)i_map + i*BLOCK_SIZE));
 	}
 
 	/* Write block map to disk */
 	for (i = 0; i < sblock.dataMapNumBlock; i++) {
-		bwrite(DISK_NAME, 1+i+sblock.inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE));
+		bwrite(DEVICE_IMAGE, 1+i+sblock.inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE));
 	}
 
 	/* Write inodes to disk */
 	for (i = 0; i < (sblock.numInodes*sizeof(inode_t)/BLOCK_SIZE); i++) {
-		bwrite(DISK_NAME, i+sblock.firstInode, ((char *)inodes + i*BLOCK_SIZE));
+		bwrite(DEVICE_IMAGE, i+sblock.firstInode, ((char *)inodes + i*BLOCK_SIZE));
 	}
 
-	return 1;
+	return 0;
 }
 
-int fileexists(char *filename) {
-    int i;
-
-    for (i = 0; i < sblock.numInodes; i++) {
-        if((i_map[i] == 0) && (strcmp(inodes[i].name, filename) == 0)) {
-            return 1;
-        }
-    }
-
-    return 0;
-}

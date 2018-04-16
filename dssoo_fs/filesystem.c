@@ -430,11 +430,38 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 
 /*
  * @brief	Modifies the position of the seek pointer of a file.
- * @return	0 if succes, -1 otherwise.
+ * @return	0 if success, -1 otherwise.
  */
 int lseekFile(int fileDescriptor, long offset, int whence)
 {
-	return -1;
+	/* to check the inode_id vality */
+	if (fileDescriptor > sblock.numInodes) {
+		return -1;
+	}
+
+	switch (whence) {
+		case FS_SEEK_CUR:
+			if (inodes_x[fileDescriptor].position + offset > inodes[fileDescriptor].size) {
+				fprintf(stderr, "Error in lseekFile: out of bounds of file\n");
+				return -1;
+			}
+			inodes_x[fileDescriptor].position += offset;
+			break;
+		case FS_SEEK_END:
+			if (offset > 0) {
+				fprintf(stderr, "Error in lseekFile: out of bounds of file\n");
+				return -1;
+			}
+			inodes_x[fileDescriptor].position = (inodes[fileDescriptor].size - offset);
+			break;
+		case FS_SEEK_BEGIN:
+			if (offset > inodes[fileDescriptor].size) {
+				inodes_x[fileDescriptor].position = offset;
+			}
+			break;
+	}
+
+	return 0;
 }
 
 /*

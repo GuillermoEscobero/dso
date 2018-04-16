@@ -18,4 +18,3 @@ int bfree(int block_id);
 int namei(char *fname);
 int bmap(int inode_id, int offset);
 int fssync();
-int fileexists(char *filename);

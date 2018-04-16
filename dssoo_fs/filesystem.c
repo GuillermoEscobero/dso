@@ -38,7 +38,7 @@ int mkFS(long deviceSize)
 
     unsigned int deviceBlocks = floor(deviceSize/BLOCK_SIZE);
     printf("deviceBlocks = %u\n", deviceBlocks);
-    
+
     // unsigned int inodeBlocks = (unsigned int)ceil((MAX_FILESYSTEM_OBJECTS_SUPPORTED*sizeof(inode_t))/BLOCK_SIZE);
     unsigned int inodeBlocks = 1;
     printf("Blocks for inodes = %u\n", inodeBlocks);
@@ -46,12 +46,12 @@ int mkFS(long deviceSize)
     // unsigned int inodeMapBlocks = (unsigned int)ceil((MAX_FILESYSTEM_OBJECTS_SUPPORTED*(unsigned int)sizeof(char))/BLOCK_SIZE);
     unsigned int inodeMapBlocks = 1;
     printf("inodeMapBlocks = %u\n", inodeMapBlocks);
-    
+
     // unsigned int dataMapBlocks = ceil(deviceBlocks*sizeof(char)/BLOCK_SIZE);
     unsigned int dataMapBlocks = 1;
     printf("dataMapBlocks = %u\n", dataMapBlocks);
 
-	unsigned int dataBlockNum = deviceBlocks - 1 - inodeMapBlocks - dataMapBlocks - inodeBlocks; 
+	unsigned int dataBlockNum = deviceBlocks - 1 - inodeMapBlocks - dataMapBlocks - inodeBlocks;
     if(dataBlockNum < 0) {
         printf("ERROR no data blocks\n");
         return -1;
@@ -162,15 +162,26 @@ int createFile(char *fileName)
 	inode_id = ialloc();
 	printf("inode_id = %u\n", inode_id);
     if(inode_id < 0) {return inode_id;}
-	
+
     /* Allocate indirect block */
     b_id = alloc();
 	printf("b_id = %u\n", b_id);
 	if(b_id < 0) {ifree(inode_id); return b_id;}
 
+		/* Initialize name */
     memset(inodes[inode_id].name, '\0', sizeof(FILENAME_MAXLEN));
 	strcpy(inodes[inode_id].name, fileName);
 	inodes[inode_id].undirectBlock = b_id;
+
+	/* Initialize undirectBlock */
+	char buf[BLOCK_SIZE];
+	undirectBlock_t newIndBlock;
+	memmove(buf, &newIndBlock, sizeof(undirectBlock_t));
+
+	bwrite(DEVICE_IMAGE, b_id, buf);
+
+	/* Initialize size of the file */
+	inodes[inode_id].size = 0;
 
 	inodes_x[inode_id].position = 0;
 	inodes_x[inode_id].opened = 1;
@@ -193,22 +204,25 @@ int removeFile(char *fileName)
     unsigned int undirectBlock_id = inodes[inode_id].undirectBlock;
 
     int i = 0;
-    char *buf = (char*)malloc(sizeof(undirectBlock));
-    undirectBlock u_block;
+    char *buf = (char*)malloc(sizeof(undirectBlock_t));
+    undirectBlock_t u_block;
 
-    bread(DEVICE_IMAGE, undirectBlock_id, buf);
-    memmove(&u_block, buf, BLOCK_SIZE);
+    bread(DEVICE_IMAGE, undirectBlock_id, (char*)&u_block);
+    //memmove(&u_block, buf, BLOCK_SIZE);
 
     free(buf);
-    
-    do {
-        bfree(u_block.dataBlocks[i]);
 
-        i++;
-        size -= BLOCK_SIZE;
-    } while(size > BLOCK_SIZE);
+		if(inodes[inode_id].size != 0) { /* If the size is 0, no data blocks are used */
+			do {
+	        bfree(u_block.dataBlocks[i]);
+
+	        i++;
+	        size -= BLOCK_SIZE;
+	    } while(size > BLOCK_SIZE);
+		}
 
 	bfree(inodes[inode_id].undirectBlock);
+	closeFile(inode_id);
 	memset(&(inodes[inode_id]), 0, sizeof(inode_t));
 	ifree(inode_id);
 
@@ -254,56 +268,154 @@ int closeFile(int fileDescriptor)
  * @brief	Reads a number of bytes from a file and stores them in a buffer.
  * @return	Number of bytes properly read, -1 in case of error.
  */
-/*
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
 	char b[BLOCK_SIZE];
-	int b_id;
+	unsigned int b_id;
+
+	// ESTO SOLO TESTING PARA GUILLE
+	inodes_x[fileDescriptor].position = 0;
+	// OJOOOOOOOOO
 
 	if (inodes_x[fileDescriptor].position+numBytes > inodes[fileDescriptor].size) {
 		numBytes = inodes[fileDescriptor].size - inodes_x[fileDescriptor].position;
 	}
 
 	if (numBytes <= 0) {
+		fprintf(stderr, "Error reading file: Segmentation fault\n");
 		return -1;
 	}
 
-	b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
-	bread(DEVICE_IMAGE, b_id, b);
-	memmove(buffer, b+inodes_x[fileDescriptor].position, numBytes);
-	inodes_x[fileDescriptor].position += numBytes;
+	unsigned int u_block_id = inodes[fileDescriptor].undirectBlock;
+	undirectBlock_t u_block;
+	bread(DEVICE_IMAGE, u_block_id, (char*)&u_block);
 
-	return numBytes;
+	unsigned int copiedSoFar = 0;
+	unsigned int bytesRemainingOnCurrentBlock = 0;
+	bytesRemainingOnCurrentBlock = BLOCK_SIZE - (inodes_x[fileDescriptor].position%BLOCK_SIZE);
+
+	while (numBytes > 0) {
+		b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
+
+		if (bytesRemainingOnCurrentBlock > 0) {
+			bread(DEVICE_IMAGE, u_block.dataBlocks[b_id], b);
+			memmove(buffer+copiedSoFar, b+inodes_x[fileDescriptor].position, bytesRemainingOnCurrentBlock);
+			inodes_x[fileDescriptor].position += bytesRemainingOnCurrentBlock;
+			copiedSoFar += bytesRemainingOnCurrentBlock;
+			numBytes -= bytesRemainingOnCurrentBlock;
+			bytesRemainingOnCurrentBlock = 0;
+		} else {
+			if (numBytes < BLOCK_SIZE) {
+				bread(DEVICE_IMAGE, u_block.dataBlocks[b_id], b);
+				memmove(buffer+copiedSoFar, b+(inodes_x[fileDescriptor].position%BLOCK_SIZE), numBytes);
+				inodes_x[fileDescriptor].position += numBytes;
+				copiedSoFar += numBytes;
+				numBytes = 0;
+			} else {
+				bread(DEVICE_IMAGE, u_block.dataBlocks[b_id], b);
+				memmove(buffer+copiedSoFar, b, BLOCK_SIZE);
+				inodes_x[fileDescriptor].position += BLOCK_SIZE;
+				copiedSoFar += BLOCK_SIZE;
+				numBytes -= BLOCK_SIZE;
+			}
+		}
+
+	}
+
+	return copiedSoFar;
 }
-*/
 
 /*
  * @brief	Writes a number of bytes from a buffer and into a file.
  * @return	Number of bytes properly written, -1 in case of error.
  */
-/*
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
 {
 	char b[BLOCK_SIZE];
-	int b_id;
+	unsigned int b_id;
 
-	if (inodes_x[fileDescriptor].position+numBytes > BLOCK_SIZE) {
-		numBytes = BLOCK_SIZE - inodes_x[fileDescriptor].position;
+	if (inodes_x[fileDescriptor].position+numBytes > MAX_FILE_SIZE) {
+		numBytes = MAX_FILE_SIZE - inodes_x[fileDescriptor].position;
+		printf("Warning: Only %d bytes will be written\n", numBytes);
 	}
 
 	if (numBytes <= 0) {
+		fprintf(stderr, "Error writing file: Segmentation fault\n");
 		return -1;
 	}
 
-	b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
-	bread(DEVICE_IMAGE, b_id, b);
-	memmove(b+inodes_x[fileDescriptor].position, buffer, numBytes);
-	bwrite(DEVICE_IMAGE, b_id, b);
-	inodes_x[fileDescriptor].position += numBytes;
+	unsigned int u_block_id = inodes[fileDescriptor].undirectBlock;
+	undirectBlock_t u_block;
+	bread(DEVICE_IMAGE, u_block_id, (char*)&u_block);
 
-	return numBytes;
+	unsigned int i = 0;
+	unsigned int copiedSoFar = 0;
+
+	unsigned int bytesFreeOnCurrentBlock = 0;
+	unsigned int blocksToAllocate = 0;
+	unsigned int blocksAlreadyUsed;
+
+	if (inodes[fileDescriptor].size == 0) {
+		blocksAlreadyUsed = 0;
+	} else{
+		blocksAlreadyUsed = (inodes[fileDescriptor].size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+	}
+
+	bytesFreeOnCurrentBlock = BLOCK_SIZE - (inodes_x[fileDescriptor].position%BLOCK_SIZE);
+
+	/* Do we need to allocate new blocks for writing? */
+	if (inodes_x[fileDescriptor].position+numBytes > inodes[fileDescriptor].size) {
+		/* Yes, we do */
+		/* Ceiling function for integer numbers division */
+		blocksToAllocate = ((numBytes-bytesFreeOnCurrentBlock) + BLOCK_SIZE - 1) / BLOCK_SIZE;
+	} else {
+		/* The user wants to overwrite data */
+	}
+
+	for (i = 0; i < blocksToAllocate; i++) {
+		u_block.dataBlocks[blocksAlreadyUsed+i] = alloc();
+	}
+
+	while (numBytes > 0) {
+		b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
+		/* Fill current block remaining space first (if any) */
+		if (bytesFreeOnCurrentBlock > 0) {
+			bread(DEVICE_IMAGE, u_block.dataBlocks[b_id], b);
+			memmove(b+inodes_x[fileDescriptor].position, buffer+copiedSoFar, bytesFreeOnCurrentBlock);
+			bwrite(DEVICE_IMAGE, u_block.dataBlocks[b_id], b);
+			inodes_x[fileDescriptor].position += bytesFreeOnCurrentBlock;
+			copiedSoFar += bytesFreeOnCurrentBlock;
+			numBytes -= bytesFreeOnCurrentBlock;
+			bytesFreeOnCurrentBlock = 0;
+		} else {
+			/* Then fill the new allocated blocks (if any) */
+			if (numBytes < BLOCK_SIZE) {
+				/* Last operation if enters here */
+				memmove(b+(inodes_x[fileDescriptor].position%BLOCK_SIZE), buffer+copiedSoFar, numBytes);
+				inodes_x[fileDescriptor].position += numBytes;
+				copiedSoFar += numBytes;
+				numBytes = 0;
+			} else {
+				memmove(b, buffer+copiedSoFar, BLOCK_SIZE);
+				inodes_x[fileDescriptor].position += BLOCK_SIZE;
+				copiedSoFar += BLOCK_SIZE;
+				numBytes -= BLOCK_SIZE;
+			}
+			bwrite(DEVICE_IMAGE, u_block.dataBlocks[b_id], b);
+		}
+
+
+		printf("Aqui la blokada %d **********************\n", b_id);
+		printf("%s\n", b);
+		printf("******************************************\n");
+	}
+	printf("SE HAN ESCRITO %d BLOQUES\n", i);
+
+	bwrite(DEVICE_IMAGE, u_block_id, (char*)&u_block);
+
+	inodes[fileDescriptor].size += copiedSoFar;
+	return copiedSoFar;
 }
-*/
 
 /*
  * @brief	Modifies the position of the seek pointer of a file.
@@ -385,7 +497,7 @@ int bfree(int block_id) {
 		return -1;
 	}
 
-	/* free inode */
+	/* free data block */
 	b_map[block_id] = 0;
 
 	return 0;
@@ -446,4 +558,3 @@ int fssync(void) {
 
 	return 0;
 }
-

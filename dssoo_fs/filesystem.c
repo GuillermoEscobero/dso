@@ -386,6 +386,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 
 	while (numBytes > 0) {
 		//b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
+		memset(b, 0, BLOCK_SIZE);
 		if (bytesFreeOnCurrentBlock == BLOCK_SIZE) {
 			bytesFreeOnCurrentBlock = 0;
 		}
@@ -423,8 +424,20 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	}
 
 	bwrite(DEVICE_IMAGE, u_block_id, (char*)&u_block);
-
 	inodes[fileDescriptor].size += copiedSoFar;
+
+	unsigned char buf[BLOCK_SIZE];
+	inodes[fileDescriptor].checksum = 0;
+
+	blocksAlreadyUsed = (inodes[fileDescriptor].size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+	for (i = 0; i < blocksAlreadyUsed; i++) {
+		bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
+		memmove(buf, b, BLOCK_SIZE);
+		inodes[fileDescriptor].checksum = CRC16(buf, BLOCK_SIZE, inodes[fileDescriptor].checksum);
+	}
+
+	printf("CHECKSUM CHANGED FILE: %d\n", inodes[fileDescriptor].checksum);
+
 	return copiedSoFar;
 }
 
@@ -441,23 +454,18 @@ int lseekFile(int fileDescriptor, long offset, int whence)
 
 	switch (whence) {
 		case FS_SEEK_CUR:
-			if (inodes_x[fileDescriptor].position + offset > inodes[fileDescriptor].size) {
+			if ((inodes_x[fileDescriptor].position + offset >= inodes[fileDescriptor].size)
+			 ||(inodes_x[fileDescriptor].position + offset < 0)) {
 				fprintf(stderr, "Error in lseekFile: out of bounds of file\n");
 				return -1;
 			}
 			inodes_x[fileDescriptor].position += offset;
 			break;
 		case FS_SEEK_END:
-			if (offset > 0) {
-				fprintf(stderr, "Error in lseekFile: out of bounds of file\n");
-				return -1;
-			}
-			inodes_x[fileDescriptor].position = (inodes[fileDescriptor].size - offset);
+			inodes_x[fileDescriptor].position = inodes[fileDescriptor].size - 1;
 			break;
 		case FS_SEEK_BEGIN:
-			if (offset > inodes[fileDescriptor].size) {
-				inodes_x[fileDescriptor].position = offset;
-			}
+			inodes_x[fileDescriptor].position = 0;
 			break;
 	}
 
@@ -479,7 +487,35 @@ int checkFS(void)
  */
 int checkFile(char *fileName)
 {
-	return -2;
+	int fd;
+	char b[BLOCK_SIZE];
+	unsigned char buf[BLOCK_SIZE];
+	int i;
+	fd = namei(fileName);
+
+	printf("CHECKSUM de %s %u\n", fileName, inodes[fd].checksum);
+	uint16_t now = 0;
+
+	unsigned int blocksAlreadyUsed = (inodes[fd].size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+
+	unsigned int u_block_id = inodes[fd].undirectBlock;
+	undirectBlock_t u_block;
+	bread(DEVICE_IMAGE, u_block_id, (char*)&u_block);
+
+	for (i = 0; i < blocksAlreadyUsed; i++) {
+		bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
+		printf("pero que cojones pasa: %s\n", b);
+		memmove(buf, b, BLOCK_SIZE);
+		now = CRC16(buf, BLOCK_SIZE, now);
+	}
+	printf("CHECKSUM de %s %u\n", fileName, now);
+	if (inodes[fd].checksum == now) {
+		printf("CARAMELOOOOOO\n");
+	} else {
+		printf("NOOOOOOOOOOOO\n");
+	}
+
+	return 0;
 }
 
 
@@ -487,9 +523,9 @@ int ialloc(void) {
 	int i;
 	/* To search for a free inode */
 	for (i = 0; i < sblock.numInodes; i++) {
-		if (i_map[i] == 0) {
+		if (bitmap_getbit(i_map, i) == 0) {
 			/* inode busy right now */
-			i_map[i] = 1;
+			bitmap_setbit(i_map, i, 1);
 			/* Default values for the inode */
 			memset(&(inodes[i]), 0, sizeof(inode_t));
 			/* Return the inode identification */
@@ -504,9 +540,10 @@ int alloc(void) {
 	char buffer[BLOCK_SIZE];
 
 	for (i = 0; i < sblock.dataBlockNum; i++) {
-		if (b_map[i] == 0) {
+		if (bitmap_getbit(b_map, i) == 0) {
 			/* busy block right now */
-			b_map[i] = 1;
+			bitmap_setbit(b_map, i, 1);
+
 			/* default values for the block */
 			memset(buffer, 0, BLOCK_SIZE);
 			bwrite(DEVICE_IMAGE, i+sblock.firstDataBlock, buffer);
@@ -524,7 +561,7 @@ int ifree(int inode_id) {
 	}
 
 	/* free inode */
-	i_map[inode_id] = 0;
+	bitmap_setbit(i_map, inode_id, 0);
 
 	return 0;
 }
@@ -536,13 +573,16 @@ int bfree(int block_id) {
 	}
 
 	/* free data block */
-	b_map[block_id] = 0;
+	bitmap_setbit(b_map, block_id, 0);
 
 	return 0;
 }
 
 int namei(char *fname) {
 	int i;
+	if (strlen(fname) > FILENAME_MAXLEN) {
+		fprintf(stderr, "Error: file name too long\n");
+	}
 	/* seek for the inode with name <fname> */
 	for (i = 0; i < sblock.numInodes; i++) {
 		if (!strcmp(inodes[i].name, fname)) {

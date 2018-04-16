@@ -93,5 +93,3 @@ uint32_t CRC32(const unsigned char* buffer, unsigned int length, uint32_t prev_c
 {
 	return (uint32_t) (crc32(crc32(prev_crc, Z_NULL, 0), buffer, length) & 0xFFFFFFFF);
 }
-
-

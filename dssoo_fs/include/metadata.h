@@ -6,6 +6,8 @@
  * @date	01/03/2017
  */
 
+#include <stdint.h>
+
 #define bitmap_getbit(bitmap_, i_) (bitmap_[i_ >> 3] & (1 << (i_ & 0x07)))
 static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
   if (val_)
@@ -34,9 +36,9 @@ typedef struct {
 
 typedef struct {
   char name[FILENAME_MAXLEN];
-  //unsigned int directBlocks[12];
   unsigned int undirectBlock;
   unsigned int size;
+  uint16_t checksum;
 } inode_t;
 
 typedef struct {

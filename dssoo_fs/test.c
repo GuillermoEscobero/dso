@@ -123,6 +123,8 @@ printf("ret del lee: %d\n", ret);
 
 printf("PUTO CARAMELO??: %s\n", buffer2);
 
+checkFile("test32.txt");
+
 	///////
 
 	ret = removeFile("test.txt");
@@ -141,8 +143,13 @@ printf("PUTO CARAMELO??: %s\n", buffer2);
 
 	///////
 	///////
+closeFile(ret);
+closeFile(ret);
+closeFile(ret);
+closeFile(ret);
 
 	ret = unmountFS();
+	printf("hasta aqui?\n");
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST unmountFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 		return -1;

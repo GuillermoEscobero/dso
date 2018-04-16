@@ -271,7 +271,7 @@ int closeFile(int fileDescriptor)
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
 	char b[BLOCK_SIZE];
-	unsigned int b_id;
+	//unsigned int b_id;
 
 	// ESTO SOLO TESTING PARA GUILLE
 	inodes_x[fileDescriptor].position = 0;
@@ -293,33 +293,39 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 	unsigned int copiedSoFar = 0;
 	unsigned int bytesRemainingOnCurrentBlock = 0;
 	bytesRemainingOnCurrentBlock = BLOCK_SIZE - (inodes_x[fileDescriptor].position%BLOCK_SIZE);
+	unsigned int i;
+	i = bmap(fileDescriptor, inodes_x[fileDescriptor].position);;
 
 	while (numBytes > 0) {
-		b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
-
+		//b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
+		printf("READING B_ID %d\n", i);
+		if (bytesRemainingOnCurrentBlock == BLOCK_SIZE) {
+			bytesRemainingOnCurrentBlock = 0;
+		}
 		if (bytesRemainingOnCurrentBlock > 0) {
-			bread(DEVICE_IMAGE, u_block.dataBlocks[b_id], b);
+			bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
 			memmove(buffer+copiedSoFar, b+inodes_x[fileDescriptor].position, bytesRemainingOnCurrentBlock);
 			inodes_x[fileDescriptor].position += bytesRemainingOnCurrentBlock;
+			printf("bytesRemainingOnCurrentBlock = %d\n", bytesRemainingOnCurrentBlock);
 			copiedSoFar += bytesRemainingOnCurrentBlock;
 			numBytes -= bytesRemainingOnCurrentBlock;
 			bytesRemainingOnCurrentBlock = 0;
 		} else {
 			if (numBytes < BLOCK_SIZE) {
-				bread(DEVICE_IMAGE, u_block.dataBlocks[b_id], b);
-				memmove(buffer+copiedSoFar, b+(inodes_x[fileDescriptor].position%BLOCK_SIZE), numBytes);
+				bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
+				memmove(buffer+copiedSoFar, b, numBytes);
 				inodes_x[fileDescriptor].position += numBytes;
 				copiedSoFar += numBytes;
 				numBytes = 0;
 			} else {
-				bread(DEVICE_IMAGE, u_block.dataBlocks[b_id], b);
+				bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
 				memmove(buffer+copiedSoFar, b, BLOCK_SIZE);
 				inodes_x[fileDescriptor].position += BLOCK_SIZE;
 				copiedSoFar += BLOCK_SIZE;
 				numBytes -= BLOCK_SIZE;
 			}
 		}
-
+		i++;
 	}
 
 	return copiedSoFar;
@@ -332,7 +338,7 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
 {
 	char b[BLOCK_SIZE];
-	unsigned int b_id;
+	//unsigned int b_id;
 
 	if (inodes_x[fileDescriptor].position+numBytes > MAX_FILE_SIZE) {
 		numBytes = MAX_FILE_SIZE - inodes_x[fileDescriptor].position;
@@ -376,13 +382,18 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 		u_block.dataBlocks[blocksAlreadyUsed+i] = alloc();
 	}
 
+	i = bmap(fileDescriptor, inodes_x[fileDescriptor].position);;
+
 	while (numBytes > 0) {
-		b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
+		//b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
+		if (bytesFreeOnCurrentBlock == BLOCK_SIZE) {
+			bytesFreeOnCurrentBlock = 0;
+		}
 		/* Fill current block remaining space first (if any) */
 		if (bytesFreeOnCurrentBlock > 0) {
-			bread(DEVICE_IMAGE, u_block.dataBlocks[b_id], b);
+			bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
 			memmove(b+inodes_x[fileDescriptor].position, buffer+copiedSoFar, bytesFreeOnCurrentBlock);
-			bwrite(DEVICE_IMAGE, u_block.dataBlocks[b_id], b);
+			bwrite(DEVICE_IMAGE, u_block.dataBlocks[i], b);
 			inodes_x[fileDescriptor].position += bytesFreeOnCurrentBlock;
 			copiedSoFar += bytesFreeOnCurrentBlock;
 			numBytes -= bytesFreeOnCurrentBlock;
@@ -391,7 +402,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 			/* Then fill the new allocated blocks (if any) */
 			if (numBytes < BLOCK_SIZE) {
 				/* Last operation if enters here */
-				memmove(b+(inodes_x[fileDescriptor].position%BLOCK_SIZE), buffer+copiedSoFar, numBytes);
+				memmove(b, buffer+copiedSoFar, numBytes);
 				inodes_x[fileDescriptor].position += numBytes;
 				copiedSoFar += numBytes;
 				numBytes = 0;
@@ -401,15 +412,15 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 				copiedSoFar += BLOCK_SIZE;
 				numBytes -= BLOCK_SIZE;
 			}
-			bwrite(DEVICE_IMAGE, u_block.dataBlocks[b_id], b);
+			bwrite(DEVICE_IMAGE, u_block.dataBlocks[i], b);
+			i++;
 		}
 
 
-		printf("Aqui la blokada %d **********************\n", b_id);
+		printf("Aqui la blokada %d **********************\n", i);
 		printf("%s\n", b);
 		printf("******************************************\n");
 	}
-	printf("SE HAN ESCRITO %d BLOQUES\n", i);
 
 	bwrite(DEVICE_IMAGE, u_block_id, (char*)&u_block);
 

@@ -478,7 +478,26 @@ int lseekFile(int fileDescriptor, long offset, int whence)
  */
 int checkFS(void)
 {
-	return -2;
+    char b[BLOCK_SIZE];
+    unsigned char buf[BLOCK_SIZE];
+    uint16_t now = 0;
+    unsigned int i;
+    unsigned int metadataBlocks = METADATA_BLOCKS_NUM;
+
+	for (i = 0; i < metadataBlocks; i++) {
+		bread(DEVICE_IMAGE, i, b);
+		memmove(buf, b, BLOCK_SIZE);
+		now = CRC16(buf, BLOCK_SIZE, now);
+	}
+
+	if (sblock.checksum == now) {
+        /* File not corrupted */
+        return 0;
+	} else {
+        /* File corrupted */
+        return -1;
+	}
+
 }
 
 /*
@@ -493,7 +512,12 @@ int checkFile(char *fileName)
 	int i;
 	fd = namei(fileName);
 
-	printf("CHECKSUM de %s %u\n", fileName, inodes[fd].checksum);
+    if (fd < 0) {
+            fprintf(stderr, "Error in checkFile: No such file or directory");
+            return -2;
+    }
+
+	// printf("CHECKSUM de %s %u\n", fileName, inodes[fd].checksum);
 	uint16_t now = 0;
 
 	unsigned int blocksAlreadyUsed = (inodes[fd].size + BLOCK_SIZE - 1) / BLOCK_SIZE;
@@ -504,15 +528,17 @@ int checkFile(char *fileName)
 
 	for (i = 0; i < blocksAlreadyUsed; i++) {
 		bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
-		printf("pero que cojones pasa: %s\n", b);
 		memmove(buf, b, BLOCK_SIZE);
 		now = CRC16(buf, BLOCK_SIZE, now);
 	}
-	printf("CHECKSUM de %s %u\n", fileName, now);
+
+	// printf("CHECKSUM de %s %u\n", fileName, now);
 	if (inodes[fd].checksum == now) {
-		printf("CARAMELOOOOOO\n");
+        /* File not corrupted */
+        return 0;
 	} else {
-		printf("NOOOOOOOOOOOO\n");
+        /* File corrupted */
+        return -1;
 	}
 
 	return 0;
@@ -582,6 +608,7 @@ int namei(char *fname) {
 	int i;
 	if (strlen(fname) > FILENAME_MAXLEN) {
 		fprintf(stderr, "Error: file name too long\n");
+        return -1;
 	}
 	/* seek for the inode with name <fname> */
 	for (i = 0; i < sblock.numInodes; i++) {
@@ -603,8 +630,8 @@ int bmap(int inode_id, int offset) {
 	//  	return inodes[inode_id].directBlock;
 	// }
 
-    int block = 0;
-    while(offset > BLOCK_SIZE) {
+    unsigned int block = 0;
+    while(offset >= BLOCK_SIZE) {
         offset -= BLOCK_SIZE;
         block++;
     }

@@ -33,9 +33,9 @@ int main() {
 	char bufferRead[3500];
 
 	//FUNCTIONAL REQUIREMENTS TESTS
-	printf("BASIC TESTING OF FUNCTIONAL REQUIREMENTS");
+	printf("BASIC TESTING OF FUNCTIONAL REQUIREMENTS\n");
 	///////Create file system F1.1
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.1", i);
+	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.1\n", i);
 	ret = mkFS(DEV_SIZE);
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
@@ -45,7 +45,7 @@ int main() {
 	i++;
 
 	///////Mount file system F1.2
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.2", i);
+	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.2\n", i);
 	ret = mountFS();
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mountFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
@@ -56,7 +56,7 @@ int main() {
 
 
 	///////Create file F1.4
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.4", i);
+	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.4\n", i);
 	ret = createFile("test.txt");
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
@@ -67,7 +67,7 @@ int main() {
 
 
 	///////Open an existing file F1.6
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.6", i);
+	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.6\n", i);
 	fd = openFile("test.txt");
 	if(fd != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
@@ -79,9 +79,9 @@ int main() {
 
 
 	///////Read an opened file F1.8
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.8", i);
+	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.8\n", i);
 	ret = readFile(fd, bufferRead, sizeof(bufferRead));
-	if(ret != 0) {
+	if(ret == -1) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST readFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 		return -1;
 	}
@@ -90,9 +90,9 @@ int main() {
 
 
 	///////Write to opened file F1.9 ALSO F7
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.9 and FUNCTIONAL REQUIREMENT 7", i);
+	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.9 and FUNCTIONAL REQUIREMENT 7\n", i);
 	ret = writeFile(fd, buffer, sizeof(buffer));
-	if(ret != 0) {
+	if(ret == -1) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST writeFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 		return -1;
 	}
@@ -101,7 +101,7 @@ int main() {
 
 
   ///////Close an opened file F1.7
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.7", i);
+	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.7\n", i);
 	ret = closeFile(fd);
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST closeFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
@@ -112,7 +112,7 @@ int main() {
 
 
 	///////Modify position of the seek pointer F1.10
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.10", i);
+	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.10\n", i);
 	ret = lseekFile(fd, 10, FS_SEEK_BEGIN);
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST lseekFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
@@ -134,7 +134,7 @@ int main() {
 
 
 	///////Remove existing file F1.5
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.5", i);
+	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.5\n", i);
 	ret = removeFile("test.txt");
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST removeFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
@@ -145,7 +145,7 @@ int main() {
 
 
 	///////Unmount file system F1.3
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.3", i);
+	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.3\n", i);
 	ret = unmountFS();
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST unmountFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
@@ -156,10 +156,10 @@ int main() {
 
 
 	//NON-FUNCTIONAL REQUIREMENTS TESTS
-	printf("BASIC TESTING OF NON-FUNCTIONAL REQUIREMENTS");
+	printf("BASIC TESTING OF NON-FUNCTIONAL REQUIREMENTS\n");
 
 	///////Maximum length of file name is 32 characters NF2  ERROR EXPECTED
-	printf("TEST NUMBER %d: NON FUNCTIONAL REQUIREMENT 2", i);
+	printf("TEST NUMBER %d: NON FUNCTIONAL REQUIREMENT 2\n", i);
 	ret = createFile("abcdefghijklmnopqrstuvwxyzabcdefg"); //33 characters
 	if(ret == 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST unmountFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);

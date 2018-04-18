@@ -80,7 +80,7 @@ int main() {
 
 	///////Read an opened file F1.8
 	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.8\n", i);
-	ret = readFile(fd, bufferRead, sizeof(bufferRead));
+	ret = readFile(fd, bufferRead, 3);
 	if(ret == -1) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST readFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
 		return -1;

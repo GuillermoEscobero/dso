@@ -159,7 +159,7 @@ int main() {
 	printf("TEST NUMBER %d: NON FUNCTIONAL REQUIREMENT 2\n", i);
 	ret = createFile("abcdefghijklmnopqrstuvwxyzabcdefg"); //33 characters
 	if(ret == 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST create ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST create ", ANSI_COLOR_RED, "FAILED: it creaed the file anyway\n", ANSI_COLOR_RESET);
 		return -1;
 	}
 	ret = createFile("abcdefghijklmnopqrstuvwxyzabcde"); //31 characters

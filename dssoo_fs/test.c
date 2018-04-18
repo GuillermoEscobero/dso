@@ -77,18 +77,6 @@ int main() {
 	i++;
 
 
-
-	///////Read an opened file F1.8
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.8\n", i);
-	ret = readFile(fd, bufferRead, 3);
-	if(ret == -1) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST readFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST readFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	i++;
-
-
 	///////Write to opened file F1.9 ALSO F7
 	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.9 and FUNCTIONAL REQUIREMENT 7\n", i);
 	ret = writeFile(fd, buffer, sizeof(buffer));
@@ -99,6 +87,15 @@ int main() {
 	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST writeFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 	i++;
 
+	///////Read an opened file F1.8
+	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.8\n", i);
+	ret = readFile(fd, bufferRead, 3);
+	if(ret == -1) {
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST readFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST readFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	i++;
 
   ///////Close an opened file F1.7
 	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.7\n", i);

@@ -120,7 +120,7 @@ int main() {
 
 
 	///////Check integrity of file F1.11
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.11", i);
+	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.11\n", i);
 	ret = checkFile("test.txt");
 	if(ret != 0) {
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST checkFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
@@ -131,14 +131,14 @@ int main() {
 
 
 	///////Remove existing file F1.5
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.5\n", i);
-	ret = removeFile("test.txt");
-	if(ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST removeFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST removeFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	i++;
+	// printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.5\n", i);
+	// ret = removeFile("test.txt");
+	// if(ret != 0) {
+	// 	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST removeFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+	// 	return -1;
+	// }
+	// fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST removeFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+	// i++;
 
 
 	///////Unmount file system F1.3

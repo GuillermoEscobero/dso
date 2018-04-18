@@ -43,13 +43,14 @@ int bfree(int block_id);
 int namei(char *fname);
 
 /*
- * @brief   Return the number of the data block that contains the 
- * @return
+ * @brief   Return the index of the data block that contains the byte indicated
+ *          by the offset
+ * @return  Index of the block, -1 if not found
  * */
 int bmap(int inode_id, int offset);
 
 /*
- * @brief
- * @return
+ * @brief   Writes the metadata in memory to the disk image
+ * @return  0 if success, -1 if error
  * */
 int fssync(void);

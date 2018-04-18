@@ -123,7 +123,9 @@ printf("ret del lee: %d\n", ret);
 
 printf("PUTO CARAMELO??: %s\n", buffer2);
 
-checkFile("test32.txt");
+printf("checkkkk file: %d\n", checkFile("test32.txt"));
+printf("PERO BUENOOOOOOOOOOOOOOOOO\n");
+printf("checkkk FSS: %d\n", checkFS());
 
 	///////
 

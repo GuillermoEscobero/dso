@@ -28,7 +28,7 @@ typedef struct {
   unsigned int inodeMapNumBlocks;     /* Number of blocks of the i-node map */
   unsigned int dataMapNumBlock;       /* Number of blocks of the data map */
   unsigned int numInodes;             /* Number of i-nodes in the device */
-  unsigned int firstInode;            /* Number of the first i-node in the device (root inode) */
+  unsigned int firstInodeBlock;       /* Number of the first i-node in the device (root inode) */
   unsigned int dataBlockNum;          /* Number of the data blocks in the device */
   unsigned int firstDataBlock;        /* Number of the first data block */
   unsigned int deviceSize;            /* Total disk space (in bytes) */

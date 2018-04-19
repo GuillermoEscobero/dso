@@ -85,7 +85,7 @@ int mkFS(long deviceSize)
 								i_map = (char*)malloc(MAX_FILESYSTEM_OBJECTS_SUPPORTED*sizeof(char));
 								for (i = 0; i < sblock.numInodes; i++) {
 																// printf("Initializing i_map[%d]\n", i);
-																i_map[i] = 0;
+																bitmap_setbit(i_map, i, 0);
 								}
 
 								/* Allocate space in memory for data blocks map and initialize its elements to 0 */
@@ -168,8 +168,8 @@ int unmountFS(void)
 
 								/* Call fssync() to write metadata on file */
 								if (fssync() < 0) {
-									fprintf(stderr, "Error in unmountFS: error while syncing metadata\n");
-									return -1;
+																fprintf(stderr, "Error in unmountFS: error while syncing metadata\n");
+																return -1;
 								}
 
 								free(i_map);
@@ -189,6 +189,11 @@ int createFile(char *fileName)
 
 								if(fileName == NULL) {return -2;}   /* Error with file name*/
 
+								if (strlen(fileName) > FILENAME_MAXLEN) {
+																fprintf(stderr, "Error in createFile: file name too long\n");
+																return -2;
+								}
+
 								if(namei(fileName) != -1) {
 																fprintf(stderr, "Error in createFile: file %s already exists\n", fileName);
 																return -1;
@@ -198,17 +203,17 @@ int createFile(char *fileName)
 								inode_id = ialloc();
 								// printf("inode_id = %u\n", inode_id);
 								if(inode_id < 0) {
-									fprintf(stderr, "Error in createFile: maximum number of files in the disk\n");
-									return -2;
+																fprintf(stderr, "Error in createFile: maximum number of files in the disk\n");
+																return -2;
 								}
 
 								/* Allocate indirect block */
 								b_id = alloc();
 								// printf("b_id = %u\n", b_id);
 								if(b_id < 0) {
-									ifree(inode_id); /* Free created inode */
-									fprintf(stderr, "Error in createFile: disk is full\n");
-									return -2;
+																ifree(inode_id); /* Free created inode */
+																fprintf(stderr, "Error in createFile: disk is full\n");
+																return -2;
 								}
 
 								/* INITIALIZATION OF INODE */
@@ -223,8 +228,8 @@ int createFile(char *fileName)
 								memmove(buf, &newIndBlock, sizeof(undirectBlock_t));
 								/* Write undirectBlock to disk */
 								if (bwrite(DEVICE_IMAGE, b_id, buf) < 0) {
-									fprintf(stderr, "Error in createFile: can't write undirectBlock to disk\n");
-									return -2;
+																fprintf(stderr, "Error in createFile: can't write undirectBlock to disk\n");
+																return -2;
 								}
 
 								/* Initialize size of the file */
@@ -248,14 +253,14 @@ int removeFile(char *fileName)
 								char buf[BLOCK_SIZE];
 
 								if (fileName == NULL) {
-									fprintf(stderr, "Error in removeFile: fileName can't be NULL\n");
-									return -2;
+																fprintf(stderr, "Error in removeFile: fileName can't be NULL\n");
+																return -2;
 								}
 
 								inode_id = namei(fileName); /* Search file inode */
 								if (inode_id < 0) {
-									fprintf(stderr, "Error in removeFile: file %s not found\n", fileName);
-									return -1;
+																fprintf(stderr, "Error in removeFile: file %s not found\n", fileName);
+																return -1;
 								}
 
 								size = inodes[inode_id].size;
@@ -264,8 +269,8 @@ int removeFile(char *fileName)
 								// char *buf = (char*)malloc(sizeof(undirectBlock_t));
 								undirectBlock_t u_block;
 								if (bread(DEVICE_IMAGE, undirectBlock_id, (char*)&u_block) < 0) {
-									fprintf(stderr, "Error in removeFile: can't read undirectBlock\n");
-									return -2;
+																fprintf(stderr, "Error in removeFile: can't read undirectBlock\n");
+																return -2;
 								}
 								// memmove(&u_block, buf, BLOCK_SIZE);
 								// free(buf);
@@ -276,7 +281,7 @@ int removeFile(char *fileName)
 																do {
 																								/* Wipe data setting bytes to 0 */
 																								if (bwrite(DEVICE_IMAGE, u_block.dataBlocks[i], buf) < 0) {
-																									fprintf(stderr, "Warning: block %u not properly deleted\n", u_block.dataBlocks[i]);
+																																fprintf(stderr, "Warning: block %u not properly deleted\n", u_block.dataBlocks[i]);
 																								}
 																								bfree(u_block.dataBlocks[i]);
 																								i++;
@@ -305,12 +310,12 @@ int openFile(char *fileName)
 
 								inode_id = namei(fileName);
 								if (inode_id < 0) {
-									fprintf(stderr, "Error in openFile: file %s not found\n", fileName);
-									return -1;
+																fprintf(stderr, "Error in openFile: file %s not found\n", fileName);
+																return -1;
 								}
 
 								inodes_x[inode_id].position = 0; /* Set seek descriptor to begin */
-								inodes_x[inode_id].opened = 1;	 /* Set file state to open */
+								inodes_x[inode_id].opened = 1;  /* Set file state to open */
 
 								return inode_id;
 }
@@ -322,12 +327,12 @@ int openFile(char *fileName)
 int closeFile(int fileDescriptor)
 {
 								if (fileDescriptor < 0 || fileDescriptor >= MAX_FILESYSTEM_OBJECTS_SUPPORTED) {
-									fprintf(stderr, "Error in closeFile: wrong file descriptor\n");
-									return -1;
+																fprintf(stderr, "Error in closeFile: wrong file descriptor\n");
+																return -1;
 								}
 
 								inodes_x[fileDescriptor].position = 0; /* Set seek descriptor to begin */
-								inodes_x[fileDescriptor].opened = 0;	 /* Set file state to closed */
+								inodes_x[fileDescriptor].opened = 0;  /* Set file state to closed */
 
 								return 0;
 }
@@ -372,7 +377,7 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 																}
 																if (bytesRemainingOnCurrentBlock > 0) {
 																								bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
-																								memmove(buffer+copiedSoFar, b+inodes_x[fileDescriptor].position, bytesRemainingOnCurrentBlock);
+																								memcpy(buffer+copiedSoFar, b+inodes_x[fileDescriptor].position, bytesRemainingOnCurrentBlock);
 																								inodes_x[fileDescriptor].position += bytesRemainingOnCurrentBlock;
 																								printf("bytesRemainingOnCurrentBlock = %d\n", bytesRemainingOnCurrentBlock);
 																								copiedSoFar += bytesRemainingOnCurrentBlock;
@@ -381,13 +386,13 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 																} else {
 																								if (numBytes < BLOCK_SIZE) {
 																																bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
-																																memmove(buffer+copiedSoFar, b, numBytes);
+																																memcpy(buffer+copiedSoFar, b, numBytes);
 																																inodes_x[fileDescriptor].position += numBytes;
 																																copiedSoFar += numBytes;
 																																numBytes = 0;
 																								} else {
 																																bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
-																																memmove(buffer+copiedSoFar, b, BLOCK_SIZE);
+																																memcpy(buffer+copiedSoFar, b, BLOCK_SIZE);
 																																inodes_x[fileDescriptor].position += BLOCK_SIZE;
 																																copiedSoFar += BLOCK_SIZE;
 																																numBytes -= BLOCK_SIZE;
@@ -461,7 +466,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 																/* Fill current block remaining space first (if any) */
 																if (bytesFreeOnCurrentBlock > 0) {
 																								bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
-																								memmove(b+inodes_x[fileDescriptor].position, buffer+copiedSoFar, bytesFreeOnCurrentBlock);
+																								memcpy(b+inodes_x[fileDescriptor].position, buffer+copiedSoFar, bytesFreeOnCurrentBlock);
 																								bwrite(DEVICE_IMAGE, u_block.dataBlocks[i], b);
 																								inodes_x[fileDescriptor].position += bytesFreeOnCurrentBlock;
 																								copiedSoFar += bytesFreeOnCurrentBlock;
@@ -471,12 +476,12 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 																								/* Then fill the new allocated blocks (if any) */
 																								if (numBytes < BLOCK_SIZE) {
 																																/* Last operation if enters here */
-																																memmove(b, buffer+copiedSoFar, numBytes);
+																																memcpy(b, buffer+copiedSoFar, numBytes);
 																																inodes_x[fileDescriptor].position += numBytes;
 																																copiedSoFar += numBytes;
 																																numBytes = 0;
 																								} else {
-																																memmove(b, buffer+copiedSoFar, BLOCK_SIZE);
+																																memcpy(b, buffer+copiedSoFar, BLOCK_SIZE);
 																																inodes_x[fileDescriptor].position += BLOCK_SIZE;
 																																copiedSoFar += BLOCK_SIZE;
 																																numBytes -= BLOCK_SIZE;
@@ -676,14 +681,10 @@ int namei(char *fname) {
 								int i;
 
 								if (fname == NULL) {
-									// fprintf(stderr, "Error: file not found\n");
-									return -1;
-								}
-
-								if (strlen(fname) > FILENAME_MAXLEN) {
-																// fprintf(stderr, "Error: file name too long\n");
+																// fprintf(stderr, "Error: file not found\n");
 																return -1;
 								}
+
 								/* seek for the inode with name <fname> */
 								for (i = 0; i < sblock.numInodes; i++) {
 																if (!strcmp(inodes[i].name, fname)) {

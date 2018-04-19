@@ -28,7 +28,8 @@ int main() {
 	int ret;
 	int fd;
 	int text = open("quijote.txt", O_RDONLY);
-	char *buffer = (char*)malloc(sizeof(char)*5000);
+	char buffer[5000];
+	//char *buffer = (char*)malloc(sizeof(char)*5000);
 	read(text, buffer, 5000);
 	char bufferRead[3500];
 
@@ -97,6 +98,8 @@ int main() {
 	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST readFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 	i++;
 
+	printf("%s\n", bufferRead);
+	
   ///////Close an opened file F1.7
 	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.7\n", i);
 	ret = closeFile(fd);

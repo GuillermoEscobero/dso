@@ -32,8 +32,7 @@ typedef struct {
   unsigned int dataBlockNum;          /* Number of the data blocks in the device */
   unsigned int firstDataBlock;        /* Number of the first data block */
   unsigned int deviceSize;            /* Total disk space (in bytes) */
-  uint16_t     checksum;              /* CRC16 checksum of the metadata blocks */
-  char padding[BLOCK_SIZE-16];        /* Padding field (to complete a block) */
+  char padding[BLOCK_SIZE-32];        /* Padding field (to complete a block) */
 } superblock_t;
 
 typedef struct {

@@ -3,7 +3,7 @@
 
 INCLUDEDIR=./include
 CC=gcc
-CFLAGS=-g -Wall -Werror -lz -I$(INCLUDEDIR) -lm
+CFLAGS=-g -Wall -Werror -lz -I$(INCLUDEDIR)
 AR=ar
 MAKE=make
 

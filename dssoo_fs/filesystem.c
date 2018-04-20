@@ -11,8 +11,6 @@
 #include "include/metadata.h"  // Type and structure declaration of the file system
 #include "include/crc.h"   // Headers for the CRC functionality
 
-#include <math.h>
-
 /*
  * @brief  Generates the proper file system structure in a storage device, as designed by the student.
  * @return  0 if success, -1 otherwise.
@@ -82,7 +80,7 @@ int mkFS(long deviceSize)
 								bwrite(DEVICE_IMAGE, 0, (char*)&sblock);
 
 								/* Allocate space in memory for inodes map and initialize its elements to 0 */
-								i_map = (char*)malloc(MAX_FILESYSTEM_OBJECTS_SUPPORTED*sizeof(char));
+								i_map = (char*)malloc(MAX_FILESYSTEM_OBJECTS_SUPPORTED/8); /* For allocating bits */
 								for (i = 0; i < sblock.numInodes; i++) {
 																// printf("Initializing i_map[%d]\n", i);
 																bitmap_setbit(i_map, i, 0);
@@ -156,7 +154,7 @@ int mountFS(void)
  */
 int unmountFS(void)
 {
-								int i;
+								unsigned int i;
 
 								/* Check if any file still opened */
 								for (i = 0; i < sblock.numInodes; i++) {
@@ -164,6 +162,7 @@ int unmountFS(void)
 																								fprintf(stderr, "Error in unmountFS: file %s is opened\n", inodes[i].name);
 																								return -1;
 																}
+																inodes_x[i].position = 0;
 								}
 
 								/* Call fssync() to write metadata on file */
@@ -201,7 +200,6 @@ int createFile(char *fileName)
 
 								/* Allocate an inode for the new file */
 								inode_id = ialloc();
-								// printf("inode_id = %u\n", inode_id);
 								if(inode_id < 0) {
 																fprintf(stderr, "Error in createFile: maximum number of files in the disk\n");
 																return -2;
@@ -209,7 +207,6 @@ int createFile(char *fileName)
 
 								/* Allocate indirect block */
 								b_id = alloc();
-								// printf("b_id = %u\n", b_id);
 								if(b_id < 0) {
 																ifree(inode_id); /* Free created inode */
 																fprintf(stderr, "Error in createFile: disk is full\n");
@@ -419,8 +416,8 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 								}
 
 								if (numBytes <= 0) {
-																fprintf(stderr, "Error writing file: Segmentation fault\n");
-																return -1;
+																printf("Warning: no bytes have been written\n");
+																return 0;
 								}
 
 								unsigned int u_block_id = inodes[fileDescriptor].undirectBlock;
@@ -436,7 +433,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 
 								if (inodes[fileDescriptor].size == 0) {
 																blocksAlreadyUsed = 0;
-								} else{
+								} else {
 																blocksAlreadyUsed = (inodes[fileDescriptor].size + BLOCK_SIZE - 1) / BLOCK_SIZE;
 								}
 
@@ -505,11 +502,15 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 								blocksAlreadyUsed = (inodes[fileDescriptor].size + BLOCK_SIZE - 1) / BLOCK_SIZE;
 								for (i = 0; i < blocksAlreadyUsed; i++) {
 																bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
-																memmove(buf, b, BLOCK_SIZE);
+																memcpy(buf, b, BLOCK_SIZE);
 																inodes[fileDescriptor].checksum = CRC16(buf, BLOCK_SIZE, inodes[fileDescriptor].checksum);
 								}
 
 								printf("CHECKSUM CHANGED FILE: %d\n", inodes[fileDescriptor].checksum);
+
+								if (inodes_x[fileDescriptor].position == inodes[fileDescriptor].size) {
+									return 0;
+								}
 
 								return copiedSoFar;
 }
@@ -543,34 +544,6 @@ int lseekFile(int fileDescriptor, long offset, int whence)
 								}
 
 								return 0;
-}
-
-/*
- * @brief  Verifies the integrity of the file system metadata.
- * @return  0 if the file system is correct, -1 if the file system is corrupted, -2 in case of error.
- */
-int checkFS(void)
-{
-								char b[BLOCK_SIZE];
-								unsigned char buf[BLOCK_SIZE];
-								uint16_t now = 0;
-								unsigned int i;
-								unsigned int metadataBlocks = METADATA_BLOCKS_NUM;
-
-								for (i = 0; i < metadataBlocks; i++) {
-																bread(DEVICE_IMAGE, i, b);
-																memmove(buf, b, BLOCK_SIZE);
-																now = CRC16(buf, BLOCK_SIZE, now);
-								}
-
-								if (sblock.checksum == now) {
-																/* File not corrupted */
-																return 0;
-								} else {
-																/* File corrupted */
-																return -1;
-								}
-
 }
 
 /*

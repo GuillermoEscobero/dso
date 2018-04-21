@@ -410,6 +410,10 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 								char b[BLOCK_SIZE];
 								//unsigned int b_id;
 
+								if (inodes_x[fileDescriptor].position == inodes[fileDescriptor].size) {
+									return 0;
+								}
+
 								if (inodes_x[fileDescriptor].position+numBytes > MAX_FILE_SIZE) {
 																numBytes = MAX_FILE_SIZE - inodes_x[fileDescriptor].position;
 																printf("Warning: Only %d bytes will be written\n", numBytes);
@@ -507,10 +511,6 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 								}
 
 								printf("CHECKSUM CHANGED FILE: %d\n", inodes[fileDescriptor].checksum);
-
-								if (inodes_x[fileDescriptor].position == inodes[fileDescriptor].size) {
-									return 0;
-								}
 
 								return copiedSoFar;
 }

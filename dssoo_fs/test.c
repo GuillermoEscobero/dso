@@ -22,182 +22,234 @@
 #define N_BLOCKS	25						// Number of blocks in the device
 #define DEV_SIZE 	N_BLOCKS * BLOCK_SIZE	// Device size, in bytes
 
+#define TEST_PASSED(test_name...) fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST ", test_name, ANSI_COLOR_GREEN, " SUCCESS\n\n", ANSI_COLOR_RESET)
+#define TEST_FAILED(test_name...) fprintf(stdout, "%s%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST ", test_name, ANSI_COLOR_RED, " FAILED\n\n", ANSI_COLOR_RESET)
+#define TEST_PRINT(test_number, requirement_tested...) fprintf(stdout, "%s%s%s%s%s", "TEST NUMBER ", test_number, ": REQUIREMENT ", requirement_tested, "\n")
 
 int main() {
-	int i = 1;
-	int ret;
-	int fd;
-	int text = open("quijote.txt", O_RDONLY);
-	char buffer[5000];
-	//char *buffer = (char*)malloc(sizeof(char)*5000);
-	read(text, buffer, 5000);
-	char bufferRead[3500];
 
 	//FUNCTIONAL REQUIREMENTS TESTS
-	printf("BASIC TESTING OF FUNCTIONAL REQUIREMENTS\n");
-	///////Create file system F1.1
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.1\n", i);
-	ret = mkFS(DEV_SIZE);
-	if(ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
+	fprintf(stdout, "%s", "BASIC TESTING OF FUNCTIONAL REQUIREMENTS\n\n");
+
+	/**
+	 * @test 1
+	 * @requirement F1.1
+	 * @description Create a file system
+	 */
+	TEST_PRINT("1", "F1.1");
+	if(mkFS(DEV_SIZE) == 0) {
+		TEST_PASSED("mkFS");
+	} else {
+		TEST_FAILED("mkFS");
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mkFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	i++;
 
-	///////Mount file system F1.2
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.2\n", i);
-	ret = mountFS();
-	if(ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mountFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
+	/**
+	 * @test 2
+	 * @requirement F1.2
+	 * @description Mount a file system
+	 */
+	TEST_PRINT("2", "F1.2");
+	if(mountFS() == 0) {
+		TEST_PASSED("mountFS");
+	} else {
+		TEST_FAILED("mountFS");
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mountFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	i++;
 
-
-	///////Create file F1.4
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.4\n", i);
-	ret = createFile("test.txt");
-	if(ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
+	/**
+	 * @test 4
+	 * @requirement F1.4
+	 * @description Create a file within the file system
+	 */
+	TEST_PRINT("4", "F1.4");
+	if(createFile("test.txt") == 0 ) {
+		TEST_PASSED("createFile");
+	} else {
+		TEST_FAILED("createFile");
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	i++;
 
-
-	///////Open an existing file F1.6
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.6\n", i);
-	fd = openFile("test.txt");
-	if(fd != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
+	/**
+	 * @test 6
+	 * @requirement F1.6
+	 * @description Open an existing file
+	 */
+	TEST_PRINT("6", "F1.6");
+	int fd = openFile("test.txt");
+	if (fd != -1 && fd != -2) {
+		TEST_PASSED("openFile");
+	} else {
+		TEST_FAILED("openFile");
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST openFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	i++;
 
+	int fd2 = open("quijote.txt", O_RDONLY);
+	char write_buffer[3000];
+	read(fd2, write_buffer, sizeof(write_buffer));
 
-	///////Write to opened file F1.9 ALSO F7
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.9 and FUNCTIONAL REQUIREMENT 7\n", i);
-	ret = writeFile(fd, buffer, sizeof(buffer));
-	if(ret == -1) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST writeFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
+	/**
+	 * @test 9
+	 * @requirement F1.9, F7
+	 * @description Write to an opened file, A file could be modified by means of write operations.
+	 */
+	TEST_PRINT("9", "F1.9, F7");
+	int bytes_written = writeFile(fd, write_buffer, sizeof(write_buffer));
+	if( bytes_written == sizeof(write_buffer)) {
+		TEST_PASSED("writeFile");
+	} else {
+		TEST_FAILED("writeFile");
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST writeFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	i++;
 
-	///////Read an opened file F1.8
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.8\n", i);
-	ret = readFile(fd, bufferRead, 3);
-	if(ret == -1) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST readFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
+	/**
+	 * @test 8
+	 * @requirement F1.8
+	 * @description Read from an opened file
+	 */
+	TEST_PRINT("8", "F1.8");
+	char read_buffer[3000];
+	if(readFile(fd, read_buffer, sizeof(write_buffer)) == bytes_written) {
+		TEST_PASSED("readFile");
+	} else {
+		TEST_FAILED("readFile");
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST readFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	i++;
 
-	printf("%s\n", bufferRead);
-	
-  ///////Close an opened file F1.7
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.7\n", i);
-	ret = closeFile(fd);
-	if(ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST closeFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
+	/**
+	 * @test 10
+	 * @requirement F1.10
+	 * @description Modify the position of the seek pointer
+	 */
+	//TEST_PRINT("10", "F1.10");
+	//ret = lseekFile(fd, 10, FS_SEEK_BEGIN);
+	//if(ret != 0) {
+	//	TEST_FAILED("lseekFile");
+	//	return -1;
+	//}
+	//TEST_PASSED("lseekFile");
+
+	/**
+	 * @test 7
+	 * @requirement F1.7
+	 * @description Close an opened file
+	 */
+	TEST_PRINT("7", "F1.7");
+	if(closeFile(fd2) == 0) {
+		TEST_PASSED("closeFile");
+	} else {
+		TEST_FAILED("closeFile");
 	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST closeFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	i++;
 
+	//TODO: Pa que sirve esto?
+	// printf("%s\n", bufferRead);
 
-	///////Modify position of the seek pointer F1.10
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.10\n", i);
-	ret = lseekFile(fd, 10, FS_SEEK_BEGIN);
-	if(ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST lseekFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST lseekFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	i++;
+	/**
+	 * @test 12
+	 * @requirement F2
+	 * @description Every time a file is opened, its seek pointer will be reset to the beginning of the file.
+	 */
 
+	/**
+	 * @test 11
+	 * @requirement F1.11
+	 * @description Check the integrity an existing file
+	 */
+	//TEST_PRINT("11", "F1.11");
+	//ret = checkFile("test.txt");
+	//if(ret != 0) {
+	//	TEST_FAILED("checkFile");
+	//	return -1;
+	//}
+	//TEST_PASSED("checkFile");
 
-	///////Check integrity of file F1.11
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.11\n", i);
-	ret = checkFile("test.txt");
-	if(ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST checkFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST checkFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	i++;
+	/**
+	 * @test 13
+	 * @requirement F3
+	 * @description Metadata shall be updated after any write operation in order to properly reflect any
+	 * modification in the file system.
+	 */
 
+	/**
+	 * @test 14
+	 * @requirement F4
+	 * @description The file system will not implement directories.
+	 */
 
-	///////Remove existing file F1.5
-	// printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.5\n", i);
-	// ret = removeFile("test.txt");
-	// if(ret != 0) {
-	// 	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST removeFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-	// 	return -1;
-	// }
-	// fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST removeFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	// i++;
+	/**
+	 * @test 15
+	 * @requirement F5
+	 * @description File integrity must be checked, at least, on open operations.
+	 */
 
+	/**
+	 * @test 16
+	 * @requirement F6
+	 * @description The whole contents of a file could be read by means of several read operations.
+	 */
 
-	///////Unmount file system F1.3
-	printf("TEST NUMBER %d: FUNCTIONAL REQUIREMENT 1.3\n", i);
-	ret = unmountFS();
-	if(ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST unmountFS ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST unmountFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
-	i++;
+	/**
+	 * @test 17
+	 * @requirement F8
+	 * @description As part of a write operation, file capacity may be extended by means of additional data blocks.
+	 */
 
+	/**
+	 * @test 18
+	 * @requirement F9
+	 * @description The file system can be created on partitions of the device smaller than its maximum size.
+	 */
+
+	/**
+	 * @test 3
+	 * @requirement F1.3
+	 * @description Unmount a file system
+	 */
+	//TEST_PRINT("3", "F1.3");
+	//if(unmountFS() == 0) {
+	//	TEST_PASSED("unmountFS");
+	//} else {
+	//	TEST_FAILED("unmountFS");
+	//}
+
+	/**
+	 * @test 5
+	 * @requirement F1.5
+	 * @description Remove an existing file from the file system
+	 */
+	//TEST_PRINT("5", "F1.5");
+	//if(removeFile("test.txt") == 0){
+	//	TEST_PASSED("removeFile");
+	//} else {
+	//	TEST_FAILED("removeFile");
+	//}
 
 	//NON-FUNCTIONAL REQUIREMENTS TESTS
-	printf("BASIC TESTING OF NON-FUNCTIONAL REQUIREMENTS\n");
 
-	///////Maximum length of file name is 32 characters NF2  ERROR EXPECTED
-	printf("TEST NUMBER %d: NON FUNCTIONAL REQUIREMENT 2\n", i);
-	ret = createFile("abcdefghijklmnopqrstuvwxyzabcdefg"); //33 characters
-	if(ret == 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST create ", ANSI_COLOR_RED, "FAILED: it created the file anyway\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	ret = createFile("abcdefghijklmnopqrstuvwxyzabcde"); //31 characters
-	if(ret != 0) {
-		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST create ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
-		return -1;
-	}
-	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST create ", ANSI_COLOR_GREEN, "SUCCESS: did not add the file\n", ANSI_COLOR_RESET);
-	i++;
+	//TODO:
+	//printf("BASIC TESTING OF NON-FUNCTIONAL REQUIREMENTS\n");
 
-	///////Max number of files cannot be higher than 40 NF1 --> check metadata constant MAX_FILESYSTEM_OBJECTS_SUPPORTED
+	//printf("TEST NUMBER %d: NON FUNCTIONAL REQUIREMENT 1\n", i);
+	//char* string = "File ";
+	//for (int j = 1; j <= 40; ++j) {
+	//	strcat(string, j);
+	//	ret = createFile(string);
+	//}
+	//i++;
 
-
-	///////Metadata shall persist between unmount and mount operations NF5
+	/////////Maximum length of file name is 32 characters NF2  ERROR EXPECTED
+	//printf("TEST NUMBER %d: NON FUNCTIONAL REQUIREMENT 2\n", i);
+	//ret = createFile("abcdefghijklmnopqrstuvwxyzabcdefg"); //33 characters
+	//if(ret == 0) {
+	//	TEST_FAILED("create (created the file anyway)");
+	//	return -1;
+	//}
+	//ret = createFile("abcdefghijklmnopqrstuvwxyzabcde"); //31 characters
+	//if(ret != 0) {
+	//	TEST_FAILED("create");
+	//	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST create ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+	//	return -1;
+	//}
+	//TEST_PASSED("create");
+	//i++;
 	//It's already been unmounted so we mount it again
-	ret = mountFS();
+	//ret = mountFS();
 	//Now check metadata
 
-
-	///////Every time a file is opened, its seek pointer will be reset to the beginning of the file. F2
-
-	///////Metadata shall be updated after any write operation in order to properly reflect any
-	///////modification in the file system. F3
-
-	///////File integrity must be checked, at least, on open operations F5
-
-	///////The whole contents of a file could be read by means of several read operations. F6
-
-	///////A file could be modified by means of write operations. F7
-
-	///////As part of a write operation, file capacity may be extended by means of additional data blocks. F8
-
-
-
-
-	close(text);
+	close(fd2);
 	return 0;
 }

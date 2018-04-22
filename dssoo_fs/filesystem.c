@@ -36,7 +36,13 @@ int mkFS(long deviceSize)
 																perror("Error while opening 'disk.dat'");
 																return -1;
 								}
+								unsigned long size = (unsigned long)lseek(fd, 0, SEEK_END);
 								close(fd);
+
+								if (size < deviceSize) {
+									fprintf(stderr, "Error in mkFS: Disk too small\n");
+									return -1;
+								}
 
 								/* Calculate the needed blocks for metadata following the design
 								 * and the device size */

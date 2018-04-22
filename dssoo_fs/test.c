@@ -38,14 +38,11 @@ int main() {
      */
     TEST_PRINT("1", "F1.1");
     //TODO: help @guillermoescobero
-    //printf("mkFS(DEV_SIZE + 1024) %d", mkFS(DEV_SIZE + BLOCK_SIZE * 40));
-    //printf("mkFS(DEV_SIZE) %d", mkFS(DEV_SIZE));
-    //if (mkFS(DEV_SIZE + 1024) == -1 && mkFS(DEV_SIZE) == 0) {
-    //    TEST_PASSED("mkFS");
-    //} else {
-    //    TEST_FAILED("mkFS");
-    //}
-    mkFS(DEV_SIZE);
+    if (mkFS(DEV_SIZE + 1024) == -1 && mkFS(DEV_SIZE) == 0) {
+        TEST_PASSED("mkFS");
+    } else {
+        TEST_FAILED("mkFS");
+    }
 
     /**
      * @test 2

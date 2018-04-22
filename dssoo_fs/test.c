@@ -105,15 +105,16 @@ int main() {
         TEST_FAILED("writeFile");
     }
 
+    lseekFile(testFileDescriptor, 0, FS_SEEK_BEGIN);
+
     /**
      * @test 8
      * @requirement F1.8
      * @description Read from an opened file
      */
     TEST_PRINT("8", "F1.8");
-    char read_buffer[64];
+    char read_buffer[sizeof(char) * 8 + 2];
 
-    //FIXME: no actualiza el seekpointer
     int a = readFile(testFileDescriptor, read_buffer, sizeof(char) * 3);
     printf("%s\n", read_buffer);
     int b = readFile(testFileDescriptor, read_buffer, sizeof(char) * 3);
@@ -173,7 +174,12 @@ int main() {
      */
     TEST_PRINT("12", "F2");
     testFileDescriptor = openFile("test.txt");
-    //TODO: if readfile reads #init# esta ok
+    readFile(testFileDescriptor, read_buffer, sizeof(char) * 6);
+    if (strcmp(read_buffer, init_string) == 0) {
+        TEST_PASSED("lseek reset on openFile");
+    } else {
+        TEST_FAILED("lseek reset on openFile");
+    }
 
     /**
      * @test 11
@@ -185,7 +191,7 @@ int main() {
         closeFile(testFileDescriptor);
         if (checkFile("test.txt") == 0) {
             //FIXME: no se como se usa bwrite hulio
-            bwrite("disk.dat", 2, write_buffer);
+            //bwrite("disk.dat", 2, write_buffer);
             if (checkFile("test.txt") == -1) {
                 TEST_PASSED("checkFile");
             } else {
@@ -218,7 +224,7 @@ int main() {
     TEST_PRINT("15", "F5");
     createFile("test.txt");
     //FIXME: no se como se usa bwrite hulio
-    bwrite("disk.dat", 2, write_buffer);
+    //bwrite("disk.dat", 2, write_buffer);
     if (openFile("test.txt") == -2) {
         TEST_PASSED("integrity check on openFile");
     } else {

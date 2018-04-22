@@ -343,10 +343,6 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 								char b[BLOCK_SIZE];
 								//unsigned int b_id;
 
-								// ESTO SOLO TESTING PARA GUILLE
-								inodes_x[fileDescriptor].position = 0;
-								// OJOOOOOOOOO
-
 								if (inodes_x[fileDescriptor].position+numBytes > inodes[fileDescriptor].size) {
 																numBytes = inodes[fileDescriptor].size - inodes_x[fileDescriptor].position;
 								}

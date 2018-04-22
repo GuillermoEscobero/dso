@@ -33,14 +33,16 @@ int main() {
 
     /**
      * @test 1
-     * @requirement F1.1
-     * @description Create a file system
+     * @requirement F1.1, F9, NF6
+     * @description Create a file system. The file system can be created on partitions of the device smaller than
+     * its maximum size. The file system will be used on disks from 50 KiB to 10 MiB.
      */
-    TEST_PRINT("1", "F1.1");
-    if (mkFS(DEV_SIZE + 1024) == -1 && mkFS(DEV_SIZE) == 0) {
+    TEST_PRINT("1", "F1.1, F9, NF6");
+    if (mkFS(24 * BLOCK_SIZE) == -1 && mkFS(DEV_SIZE * 10) == 0 && mkFS(513 * BLOCK_SIZE) == -1) {
         TEST_PASSED("mkFS");
     } else {
         TEST_FAILED("mkFS");
+        return -1;
     }
 
     /**
@@ -56,19 +58,19 @@ int main() {
     }
 
     /**
-     * @test 4
+     * @test 3
      * @requirement F1.4
      * @description Create a file within the file system
      */
     TEST_PRINT("4", "F1.4");
-    if (createFile("test.txt") == 0 && createFile("test.txt") == -1) {
+    if (createFile("test.txt") == 0 && createFile("test.txt") == -1) { // NOLINT
         TEST_PASSED("createFile");
     } else {
         TEST_FAILED("createFile");
     }
 
     /**
-     * @test 6
+     * @test 4
      * @requirement F1.6
      * @description Open an existing file
      */
@@ -86,9 +88,9 @@ int main() {
     read(quijoteFileDescriptor, write_buffer, sizeof(write_buffer));
 
     /**
-     * @test 9
+     * @test 5
      * @requirement F1.9, F7
-     * @description Write to an opened file, A file could be modified by means of write operations.
+     * @description Write to an opened file. A file could be modified by means of write operations.
      */
     TEST_PRINT("9", "F1.9, F7");
     if (writeFile(testFileDescriptor, write_buffer, sizeof(write_buffer) - sizeof(char) * 8) == 0) {
@@ -105,20 +107,19 @@ int main() {
     lseekFile(testFileDescriptor, 0, FS_SEEK_BEGIN);
 
     /**
-     * @test 8
+     * @test 6
      * @requirement F1.8
      * @description Read from an opened file
      */
     TEST_PRINT("8", "F1.8");
-    char read_buffer[8000000];
+    char read_buffer[sizeof(write_buffer)];
     if (readFile(testFileDescriptor, read_buffer, sizeof(char) * 3) == sizeof(char) * 3) {
-        int a = readFile(testFileDescriptor, read_buffer, sizeof(write_buffer) + sizeof(read_buffer));
-        int b = sizeof(write_buffer) + sizeof(read_buffer);
-        printf("%s\n", read_buffer);
-        printf("readFile(testFileDescriptor, read_buffer, sizeof(write_buffer) + sizeof(read_buffer) + 100) = %d\n"
-               "sizeof(write_buffer) + sizeof(read_buffer) = %d\n", a, b);
-        if (a == b) {
-            TEST_PASSED("readFile");
+        if (readFile(testFileDescriptor, read_buffer, sizeof(write_buffer)) == sizeof(write_buffer) - 3) {
+            if (readFile(testFileDescriptor, read_buffer, sizeof(char)) == 0) {
+                TEST_PASSED("readFile");
+            } else {
+                TEST_FAILED("readFile");
+            }
         } else {
             TEST_FAILED("readFile");
         }
@@ -127,7 +128,7 @@ int main() {
     }
 
     /**
-     * @test 10
+     * @test 7
      * @requirement F1.10
      * @description Modify the position of the seek pointer
      */
@@ -146,7 +147,7 @@ int main() {
     }
 
     /**
-     * @test 7
+     * @test 8
      * @requirement F1.7
      * @description Close an opened file
      */
@@ -158,7 +159,7 @@ int main() {
     }
 
     /**
-     * @test 12
+     * @test 9
      * @requirement F2
      * @description Every time a file is opened, its seek pointer will be reset to the beginning of the file.
      */
@@ -172,14 +173,12 @@ int main() {
     }
 
     /**
-     * @test 11
+     * @test 10
      * @requirement F1.11
      * @description Check the integrity an existing file
      */
     TEST_PRINT("11", "F1.11");
-    int debug = checkFile("test.txt");
-    printf("checkFile(\"test.txt\") = %d\n", debug);
-    if (debug == -2) {
+    if (checkFile("test.txt") == -2) {
         closeFile(testFileDescriptor);
         if (checkFile("test.txt") == 0) {
             bwrite("disk.dat", 5, write_buffer);
@@ -189,37 +188,43 @@ int main() {
                 TEST_FAILED("checkFile 1");
             }
         } else {
-            TEST_FAILED("checkFile 2");
+            TEST_FAILED("checkFile");
         }
     } else {
-        TEST_FAILED("checkFile 3");
+        TEST_FAILED("checkFile");
     }
 
     /**
-     * @test 5
+     * @test 11
      * @requirement F1.5
      * @description Remove an existing file from the file system
      */
     TEST_PRINT("5", "F1.5");
-    if (removeFile("test.txt") == 0 && removeFile("test.txt") == -1) {
+    if (removeFile("test.txt") == 0 && removeFile("test.txt") == -1) { // NOLINT
         TEST_PASSED("removeFile");
     } else {
         TEST_FAILED("removeFile");
     }
 
     /**
-     * @test 15
+     * @test 12
      * @requirement F5
      * @description File integrity must be checked, at least, on open operations.
      */
     TEST_PRINT("15", "F5");
     createFile("test.txt");
+    testFileDescriptor = openFile("test.txt");
+    writeFile(testFileDescriptor, write_buffer, sizeof(char) * 750);
+    closeFile(testFileDescriptor);
+
     bwrite("disk.dat", 5, write_buffer);
-    if (openFile("test.txt") == -2) {
+    testFileDescriptor = openFile("test.txt");
+    if (testFileDescriptor == -2) {
         TEST_PASSED("integrity check on openFile");
     } else {
         TEST_FAILED("integrity check on openFile");
     }
+    removeFile("test.txt");
 
     /**
      * @test 13
@@ -227,104 +232,142 @@ int main() {
      * @description Metadata shall be updated after any write operation in order to properly reflect any
      * modification in the file system.
      */
+    //TODO:
 
     /**
      * @test 14
      * @requirement F4
      * @description The file system will not implement directories.
      */
+    //TODO:
+
 
     /**
-     * @test 16
+     * @test 15
      * @requirement F6
      * @description The whole contents of a file could be read by means of several read operations.
      */
+    TEST_PRINT("16", "F6");
+    createFile("test.txt");
+    testFileDescriptor = openFile("test.txt");
+    writeFile(testFileDescriptor, write_buffer, sizeof(write_buffer));
+    lseekFile(testFileDescriptor, 0, FS_SEEK_BEGIN);
+    int sumBytes = readFile(testFileDescriptor, read_buffer, sizeof(char) * sizeof(write_buffer) / 4); // NOLINT
+    sumBytes += readFile(testFileDescriptor, read_buffer, sizeof(char) * sizeof(write_buffer) / 4); // NOLINT
+    sumBytes += readFile(testFileDescriptor, read_buffer, sizeof(char) * sizeof(write_buffer) / 4); // NOLINT
+    sumBytes += readFile(testFileDescriptor, read_buffer, sizeof(char) * sizeof(write_buffer) / 4); // NOLINT
+    if (sumBytes == sizeof(write_buffer)) {
+        TEST_PASSED("read in several readFiles");
+    } else {
+        TEST_FAILED("read in several readFiles");
+    }
 
     /**
-     * @test 17
+     * @test 16
      * @requirement F8
      * @description As part of a write operation, file capacity may be extended by means of additional data blocks.
      */
+    TEST_PRINT("17", "F8");
+    writeFile(testFileDescriptor, write_buffer, sizeof(write_buffer));
+    lseekFile(testFileDescriptor, 0, FS_SEEK_BEGIN);
+    if (readFile(testFileDescriptor, read_buffer, sizeof(write_buffer) * 2) == sizeof(write_buffer) * 2) {
+        TEST_PASSED("extend file capacity with writeFile");
+    } else {
+        TEST_FAILED("extend file capacity with writeFile");
+    }
+
+    close(quijoteFileDescriptor);
+    closeFile(testFileDescriptor);
+    removeFile("test.txt");
 
     /**
-     * @test 18
-     * @requirement F9
-     * @description The file system can be created on partitions of the device smaller than its maximum size.
-     */
-
-    /**
-     * @test 3
+     * @test 17
      * @requirement F1.3
      * @description Unmount a file system
      */
-    //TEST_PRINT("3", "F1.3");
-    //if(unmountFS() == 0) {
-    //	TEST_PASSED("unmountFS");
-    //} else {
-    //	TEST_FAILED("unmountFS");
-    //}
-
-
-    close(quijoteFileDescriptor);
+    TEST_PRINT("3", "F1.3");
+    if (unmountFS() == 0) {
+        TEST_PASSED("unmountFS");
+    } else {
+        TEST_FAILED("unmountFS");
+    }
 
     //NON-FUNCTIONAL REQUIREMENTS TESTS
     fprintf(stdout, "%s", "BASIC TESTING OF NON-FUNCTIONAL REQUIREMENTS\n\n");
 
+    mountFS();
+
     /**
-     * @test 19
+     * @test 18
      * @requirement NF1
      * @description The maximum number of files in the file system will never be higher than 40.
      */
-    TEST_PRINT("19", "NF1");
+    TEST_PRINT("18", "NF1");
+    char buffer[12] = {0};
+    int iteration = 1;
+    sprintf(buffer, "file%d.txt", iteration);
+
+    while (createFile(buffer) == 0) {
+        iteration++;
+        sprintf(buffer, "file%d.txt", iteration);
+    }
+    if (iteration == 41) {
+        TEST_PASSED("max number of files");
+        for (iteration = 40; iteration > 0; --iteration) {
+            sprintf(buffer, "file%d.txt", iteration);
+            removeFile(buffer);
+        }
+    } else {
+        TEST_FAILED("max number of files");
+    }
+
+    /**
+     * @test 19
+     * @requirement NF2
+     * @description The maximum length of the file name will be 32 characters.
+     */
+    TEST_PRINT("19", "NF2");
+    if (createFile("thisFilenameIsExactly32Chars.txt") == 0 && createFile("thisFilenameIsMoreThan32Chars.txt") == -2) {
+        TEST_PASSED("file name length");
+    } else {
+        TEST_FAILED("file name length");
+    }
 
     /**
      * @test 20
-     * @requirement NF2
-     * @description The maximum number of files in the file system will never be higher than 40.
+     * @requirement NF3
+     * @description The maximum size of the file will be 1 MiB.
      */
-    TEST_PRINT("20", "NF1");
+    TEST_PRINT("20", "NF3");
+    testFileDescriptor = openFile("thisFilenameIsExactly32Chars.txt");
+    char *superSizedArray = calloc(MAX_FILE_SIZE, sizeof(char));
+    printf("Bytes written in the file: %d\n", writeFile(testFileDescriptor, superSizedArray, sizeof(char) * MAX_FILE_SIZE ));
+    //TODO:
 
     /**
      * @test 21
-     * @requirement NF3
-     * @description The maximum number of files in the file system will never be higher than 40.
+     * @requirement NF4
+     * @description The file system block size will be 2048 bytes.
      */
-    TEST_PRINT("21", "NF1");
+    TEST_PRINT("21", "NF4");
+    //TODO:
+    //bread("disk.dat", 1, );
 
     /**
      * @test 22
-     * @requirement NF4
-     * @description The maximum number of files in the file system will never be higher than 40.
-     */
-    TEST_PRINT("22", "NF1");
-
-    /**
-     * @test 23
      * @requirement NF5
-     * @description The maximum number of files in the file system will never be higher than 40.
+     * @description Metadata shall persist between unmount and mount operations.
      */
-    TEST_PRINT("23", "NF1");
-
-    /**
-     * @test 24
-     * @requirement NF6
-     * @description The maximum number of files in the file system will never be higher than 40.
-     */
-    TEST_PRINT("24", "NF1");
-
-    /**
-     * @test 25
-     * @requirement NF7
-     * @description The maximum number of files in the file system will never be higher than 40.
-     */
-    TEST_PRINT("25", "NF1");
-
-    /**
-     * @test 26
-     * @requirement NF8
-     * @description The maximum number of files in the file system will never be higher than 40.
-     */
-    TEST_PRINT("26", "NF1");
+    TEST_PRINT("22", "NF5");
+    bread("disk.dat", 2, read_buffer);
+    unmountFS();
+    mountFS();
+    bread("disk.dat", 2, write_buffer);
+    if (strcmp(read_buffer, write_buffer) == 0) {
+        TEST_PASSED("persistent metadata");
+    } else {
+        TEST_FAILED("persistent metadata");
+    }
 
     return 0;
 }

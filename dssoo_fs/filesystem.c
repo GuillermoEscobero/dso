@@ -246,7 +246,7 @@ int createFile(char *fileName)
 int removeFile(char *fileName)
 {
 								int i;
-								unsigned int size, inode_id, undirectBlock_id;
+								int size, inode_id, undirectBlock_id;
 								char buf[BLOCK_SIZE];
 
 								if (fileName == NULL) {

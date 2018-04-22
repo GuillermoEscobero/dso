@@ -353,9 +353,13 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 																numBytes = inodes[fileDescriptor].size - inodes_x[fileDescriptor].position;
 								}
 
-								if (numBytes <= 0) {
+								if (numBytes < 0) {
 																fprintf(stderr, "Error reading file: Segmentation fault\n");
 																return -1;
+								}
+
+								if (numBytes == 0) {
+									return 0;
 								}
 
 								unsigned int u_block_id = inodes[fileDescriptor].undirectBlock;

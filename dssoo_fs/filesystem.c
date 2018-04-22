@@ -317,6 +317,10 @@ int openFile(char *fileName)
 																return -1;
 								}
 
+								if (checkFile(fileName) != 0) {
+									fprintf(stderr, "Error in openFile: file %s is corrupted\n", fileName);
+								}
+
 								inodes_x[inode_id].position = 0; /* Set seek descriptor to begin */
 								inodes_x[inode_id].opened = 1;  /* Set file state to open */
 

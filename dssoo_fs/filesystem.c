@@ -30,11 +30,11 @@ int mkFS(long deviceSize)
 								close(fd);
 
 								/* Ckeck if device image has correct size */
-								if (size < MIN_FILESYSTEM_SIZE) {
+								if (deviceSize < MIN_FILESYSTEM_SIZE) {
 																printf("ERROR: Disk too small\n");
 																return -1;
 								}
-								if (size > MAX_FILESYSTEM_SIZE) {
+								if (deviceSize > MAX_FILESYSTEM_SIZE) {
 																printf("ERROR: Disk too big\n");
 																return -1;
 								}
@@ -345,7 +345,7 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 								char b[BLOCK_SIZE];
 
 								/* Check the remaining bytes that can be read. If there are not
-								 *	enough, numBytes will be updated */
+								 * enough, numBytes will be updated */
 								if (inodes_x[fileDescriptor].position+numBytes > inodes[fileDescriptor].size) {
 																numBytes = inodes[fileDescriptor].size - inodes_x[fileDescriptor].position;
 								}
@@ -356,12 +356,14 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 																fprintf(stderr, "Error reading file: Segmentation fault\n");
 																return -1;
 								}
+
 								/* In this case, the seek pointer is located at EOF, so no bytes
 								 * can be read */
 								if (numBytes == 0) {
 									return 0;
 								}
 
+								/* Get the indirect block of the file to know */
 								unsigned int u_block_id = inodes[fileDescriptor].undirectBlock;
 								undirectBlock_t u_block;
 								bread(DEVICE_IMAGE, u_block_id, (char*)&u_block);

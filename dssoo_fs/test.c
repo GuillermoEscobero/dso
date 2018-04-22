@@ -37,7 +37,6 @@ int main() {
      * @description Create a file system
      */
     TEST_PRINT("1", "F1.1");
-    //TODO: help @guillermoescobero
     if (mkFS(DEV_SIZE + 1024) == -1 && mkFS(DEV_SIZE) == 0) {
         TEST_PASSED("mkFS");
     } else {
@@ -111,27 +110,16 @@ int main() {
      * @description Read from an opened file
      */
     TEST_PRINT("8", "F1.8");
-    char read_buffer[sizeof(char) * 8 + 2];
-
-    int a = readFile(testFileDescriptor, read_buffer, sizeof(char) * 3);
-    printf("%s\n", read_buffer);
-    int b = readFile(testFileDescriptor, read_buffer, sizeof(char) * 3);
-    printf("%s\n", read_buffer);
-    int c = readFile(testFileDescriptor, read_buffer, sizeof(char) * 2);
-    printf("%s\n", read_buffer);
-    if (a == sizeof(char) * 5) {
-        if (b == sizeof(char) * 2) {
-            if (c == 0) {
+    char read_buffer[8];
+    if (readFile(testFileDescriptor, read_buffer, sizeof(char) * 3) == sizeof(char) * 3) {
+        printf("DIOOOS %d", readFile(testFileDescriptor, read_buffer, sizeof(char) * 6));
+        if (readFile(testFileDescriptor, read_buffer, sizeof(char) * 6) == sizeof(char) * 5) {
                 TEST_PASSED("readFile");
-            } else {
-                TEST_FAILED("readFile 1");
-            }
         } else {
             TEST_FAILED("readFile 2");
         }
     } else {
         TEST_FAILED("readFile 3");
-        printf("a %d b %d c %d \n", a, b, c);
     }
 
     /**

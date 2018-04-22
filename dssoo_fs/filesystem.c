@@ -367,10 +367,14 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 								bread(DEVICE_IMAGE, u_block_id, (char*)&u_block);
 
 								unsigned int copiedSoFar = 0;
-								unsigned int bytesRemainingOnCurrentBlock = 0;
+								int bytesRemainingOnCurrentBlock = 0;
 								bytesRemainingOnCurrentBlock = BLOCK_SIZE - (inodes_x[fileDescriptor].position%BLOCK_SIZE);
 								unsigned int i;
-								i = bmap(fileDescriptor, inodes_x[fileDescriptor].position);;
+								i = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
+
+								if (bytesRemainingOnCurrentBlock > numBytes) {
+									bytesRemainingOnCurrentBlock = numBytes;
+								}
 
 								while (numBytes > 0) {
 																//b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);

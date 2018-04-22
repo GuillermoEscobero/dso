@@ -110,16 +110,20 @@ int main() {
      * @description Read from an opened file
      */
     TEST_PRINT("8", "F1.8");
-    char read_buffer[8];
+    char read_buffer[8000000];
     if (readFile(testFileDescriptor, read_buffer, sizeof(char) * 3) == sizeof(char) * 3) {
-        printf("DIOOOS %d", readFile(testFileDescriptor, read_buffer, sizeof(char) * 6));
-        if (readFile(testFileDescriptor, read_buffer, sizeof(char) * 6) == sizeof(char) * 5) {
-                TEST_PASSED("readFile");
+        int a = readFile(testFileDescriptor, read_buffer, sizeof(write_buffer) + sizeof(read_buffer));
+        int b = sizeof(write_buffer) + sizeof(read_buffer);
+        printf("%s\n", read_buffer);
+        printf("readFile(testFileDescriptor, read_buffer, sizeof(write_buffer) + sizeof(read_buffer) + 100) = %d\n"
+               "sizeof(write_buffer) + sizeof(read_buffer) = %d\n", a, b);
+        if (a == b) {
+            TEST_PASSED("readFile");
         } else {
-            TEST_FAILED("readFile 2");
+            TEST_FAILED("readFile");
         }
     } else {
-        TEST_FAILED("readFile 3");
+        TEST_FAILED("readFile");
     }
 
     /**
@@ -173,21 +177,22 @@ int main() {
      * @description Check the integrity an existing file
      */
     TEST_PRINT("11", "F1.11");
-    if (checkFile("test.txt") == -2) {
+    int debug = checkFile("test.txt");
+    printf("checkFile(\"test.txt\") = %d\n", debug);
+    if (debug == -2) {
         closeFile(testFileDescriptor);
         if (checkFile("test.txt") == 0) {
-            //FIXME: no se como se usa bwrite hulio
-            //bwrite("disk.dat", 2, write_buffer);
+            bwrite("disk.dat", 5, write_buffer);
             if (checkFile("test.txt") == -1) {
                 TEST_PASSED("checkFile");
             } else {
-                TEST_FAILED("checkFile");
+                TEST_FAILED("checkFile 1");
             }
         } else {
-            TEST_FAILED("checkFile");
+            TEST_FAILED("checkFile 2");
         }
     } else {
-        TEST_FAILED("checkFile");
+        TEST_FAILED("checkFile 3");
     }
 
     /**
@@ -209,8 +214,7 @@ int main() {
      */
     TEST_PRINT("15", "F5");
     createFile("test.txt");
-    //FIXME: no se como se usa bwrite hulio
-    //bwrite("disk.dat", 2, write_buffer);
+    bwrite("disk.dat", 5, write_buffer);
     if (openFile("test.txt") == -2) {
         TEST_PASSED("integrity check on openFile");
     } else {

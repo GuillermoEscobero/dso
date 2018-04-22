@@ -560,11 +560,6 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 																inodes[fileDescriptor].checksum = CRC16(buf, BLOCK_SIZE, inodes[fileDescriptor].checksum);
 								}
 
-								/* This is for the case in which the seek descriptor is at the EOF */
-								if (inodes_x[fileDescriptor].position == inodes[fileDescriptor].size) {
-																return 0;
-								}
-
 								return copiedSoFar;
 }
 

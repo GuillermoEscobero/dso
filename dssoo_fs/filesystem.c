@@ -40,8 +40,8 @@ int mkFS(long deviceSize)
 								}
 
 								if (size < deviceSize) {
-									fprintf(stderr, "Error in mkFS: Disk too small\n");
-									return -1;
+																fprintf(stderr, "Error in mkFS: Disk too small\n");
+																return -1;
 								}
 
 								/* Calculate the needed blocks for metadata following the design
@@ -178,7 +178,7 @@ int unmountFS(void)
  */
 int createFile(char *fileName)
 {
-								unsigned int b_id, inode_id;
+								int b_id, inode_id;
 								char buf[BLOCK_SIZE];
 
 								if(fileName == NULL) {return -2;}   /* Error with file name*/
@@ -210,7 +210,7 @@ int createFile(char *fileName)
 
 								/* INITIALIZATION OF INODE */
 								/* Initialize name */
-								memset(inodes[inode_id].name, '\0', sizeof(FILENAME_MAXLEN));
+								memset(inodes[inode_id].name, '\0', FILENAME_MAXLEN);
 								strcpy(inodes[inode_id].name, fileName);
 
 								inodes[inode_id].undirectBlock = b_id;
@@ -266,7 +266,7 @@ int removeFile(char *fileName)
 								}
 
 								i = 0;
-								memset(&buf, 0, BLOCK_SIZE);		 /* Wipe buffer */
+								memset(&buf, 0, BLOCK_SIZE);   /* Wipe buffer */
 								if(inodes[inode_id].size != 0) { /* If the size is 0, no data blocks are used */
 																while (size > 0) {
 																								/* Wipe data setting bytes to 0 */
@@ -300,6 +300,7 @@ int openFile(char *fileName)
 {
 								int inode_id;
 
+								/* Search for the inode of the file */
 								inode_id = namei(fileName);
 								if (inode_id < 0) {
 																fprintf(stderr, "Error in openFile: file %s not found\n", fileName);
@@ -309,8 +310,8 @@ int openFile(char *fileName)
 								inodes_x[inode_id].opened = 0;  /* Set file state to open */
 
 								if (checkFile(fileName) != 0) {
-									// fprintf(stderr, "Error in openFile: file %s is corrupted\n", fileName);
-									return -2;
+																// fprintf(stderr, "Error in openFile: file %s is corrupted\n", fileName);
+																return -2;
 								}
 
 								inodes_x[inode_id].position = 0; /* Set seek descriptor to begin */
@@ -342,7 +343,11 @@ int closeFile(int fileDescriptor)
  */
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
-								char b[BLOCK_SIZE];
+								unsigned int i;
+								char b[BLOCK_SIZE]; /* Auxiliary buffer for block operations */
+								unsigned int u_block_id; /* ID of the indirect block of the file */
+								int copiedSoFar = 0; /* Bytes already read */
+								int bytesRemainingOnCurrentBlock = 0; /* Bytes between the seek descriptor and the next block */
 
 								/* Check the remaining bytes that can be read. If there are not
 								 * enough, numBytes will be updated */
@@ -350,7 +355,7 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 																numBytes = inodes[fileDescriptor].size - inodes_x[fileDescriptor].position;
 								}
 
-								/* If for any reason, the seek pointer is ahead the last byte
+								/* If for some reason, the seek pointer is ahead the last byte
 								 * of the file, return -1 */
 								if (numBytes < 0) {
 																fprintf(stderr, "Error reading file: Segmentation fault\n");
@@ -360,52 +365,57 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 								/* In this case, the seek pointer is located at EOF, so no bytes
 								 * can be read */
 								if (numBytes == 0) {
-									return 0;
+																return 0;
 								}
 
-								/* Get the indirect block of the file to know */
-								unsigned int u_block_id = inodes[fileDescriptor].undirectBlock;
+								/* Get the indirect block of the file to know where are its data blocks */
+								u_block_id = inodes[fileDescriptor].undirectBlock;
 								undirectBlock_t u_block;
 								bread(DEVICE_IMAGE, u_block_id, (char*)&u_block);
 
-								unsigned int copiedSoFar = 0;
-								int bytesRemainingOnCurrentBlock = 0;
+								/* Calculate the bytes between the seek descriptor and the next block */
 								bytesRemainingOnCurrentBlock = BLOCK_SIZE - (inodes_x[fileDescriptor].position%BLOCK_SIZE);
-								unsigned int i;
-								i = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
-
-								if (bytesRemainingOnCurrentBlock > numBytes) {
-									bytesRemainingOnCurrentBlock = numBytes;
+								if (bytesRemainingOnCurrentBlock == BLOCK_SIZE) {
+																bytesRemainingOnCurrentBlock = 0;
 								}
 
+								/* We only want to read a maximum of numBytes */
+								if (bytesRemainingOnCurrentBlock > numBytes) {
+																bytesRemainingOnCurrentBlock = numBytes;
+								}
+
+								/* Get the block index where the seek descriptor is */
+								i = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
+
+								/* First we read the remaining bytes of the actual block */
+								if (bytesRemainingOnCurrentBlock > 0) {
+																/* Read the actual block */
+																bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
+																/* Read the remaining bytes in the block */
+																memcpy(buffer+copiedSoFar, b+inodes_x[fileDescriptor].position, bytesRemainingOnCurrentBlock);
+																/* Increment the seek descriptor */
+																inodes_x[fileDescriptor].position += bytesRemainingOnCurrentBlock;
+																/* Increment bytes read */
+																copiedSoFar += bytesRemainingOnCurrentBlock;
+																/* Subtract to bytes left to be read */
+																numBytes -= bytesRemainingOnCurrentBlock;
+								}
+
+								/* Now we start to read blocks until all bytes are read */
 								while (numBytes > 0) {
-																//b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
-																printf("READING B_ID %d\n", i);
-																if (bytesRemainingOnCurrentBlock == BLOCK_SIZE) {
-																								bytesRemainingOnCurrentBlock = 0;
-																}
-																if (bytesRemainingOnCurrentBlock > 0) {
-																								bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
-																								memcpy(buffer+copiedSoFar, b+inodes_x[fileDescriptor].position, bytesRemainingOnCurrentBlock);
-																								inodes_x[fileDescriptor].position += bytesRemainingOnCurrentBlock;
-																								printf("bytesRemainingOnCurrentBlock = %d\n", bytesRemainingOnCurrentBlock);
-																								copiedSoFar += bytesRemainingOnCurrentBlock;
-																								numBytes -= bytesRemainingOnCurrentBlock;
-																								bytesRemainingOnCurrentBlock = 0;
+																bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
+																/* If the remaining bytes to read are less than a block, read all of them */
+																if (numBytes < BLOCK_SIZE) {
+																								memcpy(buffer+copiedSoFar, b, numBytes);
+																								inodes_x[fileDescriptor].position += numBytes;
+																								copiedSoFar += numBytes;
+																								numBytes = 0;
 																} else {
-																								if (numBytes < BLOCK_SIZE) {
-																																bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
-																																memcpy(buffer+copiedSoFar, b, numBytes);
-																																inodes_x[fileDescriptor].position += numBytes;
-																																copiedSoFar += numBytes;
-																																numBytes = 0;
-																								} else {
-																																bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
-																																memcpy(buffer+copiedSoFar, b, BLOCK_SIZE);
-																																inodes_x[fileDescriptor].position += BLOCK_SIZE;
-																																copiedSoFar += BLOCK_SIZE;
-																																numBytes -= BLOCK_SIZE;
-																								}
+																								bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
+																								memcpy(buffer+copiedSoFar, b, BLOCK_SIZE);
+																								inodes_x[fileDescriptor].position += BLOCK_SIZE;
+																								copiedSoFar += BLOCK_SIZE;
+																								numBytes -= BLOCK_SIZE;
 																}
 																i++;
 								}
@@ -419,43 +429,58 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
 {
-								char b[BLOCK_SIZE];
-								//unsigned int b_id;
+								unsigned int i = 0;
+								char b[BLOCK_SIZE]; /* Auxiliary buffer for block operations */
+								unsigned int u_block_id; /* ID of the indirect block of the file */
+								int copiedSoFar = 0; /* Bytes already read */
+								int bytesFreeOnCurrentBlock = 0; /* Bytes between the seek descriptor and the next block */
 
+								unsigned int blocksAlreadyUsed = 0;
+								unsigned int blocksToAllocate = 0;
+
+								/* Check the remaining bytes that can be read. If there are not
+								 * enough, numBytes will be updated */
 								if (inodes_x[fileDescriptor].position+numBytes > MAX_FILE_SIZE) {
 																numBytes = MAX_FILE_SIZE - inodes_x[fileDescriptor].position;
 																printf("Warning: Only %d bytes will be written\n", numBytes);
 								}
 
-								if (numBytes <= 0) {
+								/* If for any reason, the seek pointer is ahead the last byte
+								 * of the file, return -1 */
+								if (numBytes < 0) {
+																fprintf(stderr, "Error writing file: Segmentation fault\n");
+																return -1;
+								}
+
+								/* In this case, the seek pointer is located at EOF, so no bytes
+								 * can be written */
+								if (numBytes == 0) {
 																printf("Warning: no bytes have been written\n");
 																return 0;
 								}
 
-								unsigned int u_block_id = inodes[fileDescriptor].undirectBlock;
+								/* Get the indirect block of the file to know where are its data blocks */
+								u_block_id = inodes[fileDescriptor].undirectBlock;
 								undirectBlock_t u_block;
 								bread(DEVICE_IMAGE, u_block_id, (char*)&u_block);
 
-								unsigned int i = 0;
-								unsigned int copiedSoFar = 0;
-
-								unsigned int bytesFreeOnCurrentBlock = 0;
-								unsigned int blocksToAllocate = 0;
-								unsigned int blocksAlreadyUsed;
-
+								/* Calculates the blocks already used for the file */
 								if (inodes[fileDescriptor].size == 0) {
-																blocksAlreadyUsed = 0;
+																blocksAlreadyUsed = 0; /* Empty file */
 								} else {
+																/* Ceiling function for positive integer numbers */
 																blocksAlreadyUsed = (inodes[fileDescriptor].size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-																if ((inodes[fileDescriptor].size % BLOCK_SIZE) != 0) {
-																	blocksAlreadyUsed++;
-																}
 								}
 
+								/* Calculate the bytes between the seek descriptor and the next block */
 								bytesFreeOnCurrentBlock = BLOCK_SIZE - (inodes_x[fileDescriptor].position%BLOCK_SIZE);
-
 								if (bytesFreeOnCurrentBlock == BLOCK_SIZE) {
-									bytesFreeOnCurrentBlock = 0;
+																bytesFreeOnCurrentBlock = 0;
+								}
+
+								/* We only want to write a maximum of numBytes */
+								if (bytesFreeOnCurrentBlock > numBytes) {
+																bytesFreeOnCurrentBlock = numBytes;
 								}
 
 								/* Do we need to allocate new blocks for writing? */
@@ -464,61 +489,67 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 																/* Ceiling function for integer numbers division */
 																blocksToAllocate = (numBytes-bytesFreeOnCurrentBlock) / BLOCK_SIZE;
 																if (((numBytes-bytesFreeOnCurrentBlock) % BLOCK_SIZE) != 0) {
-																	blocksToAllocate++;
+																								blocksToAllocate++;
 																}
 								} else {
 																/* The user wants to overwrite data */
 								}
-								printf("Blocks to allocate %d\n", blocksToAllocate);
 
+								/* Allocate the new needed data blocks */
 								for (i = 0; i < blocksToAllocate; i++) {
-																u_block.dataBlocks[blocksAlreadyUsed+i] = alloc();
-																printf("u_block.dataBlocks[blocksAlreadyUsed+i] = %d\n", u_block.dataBlocks[blocksAlreadyUsed+i]);
+																int newBlockID = alloc();
+																if (newBlockID < 0) {
+																								fprintf(stderr, "Error: no free space in disk to write. No bytes written\n");
+																								return -1;
+																}
+																u_block.dataBlocks[blocksAlreadyUsed+i] = newBlockID;
 								}
 
-								i = bmap(fileDescriptor, inodes_x[fileDescriptor].position);;
+								/* Get the block index where the seek descriptor is */
+								i = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
 
+								memset(b, 0, BLOCK_SIZE);
+
+								/* Fill current block remaining space first (if any) */
+								if (bytesFreeOnCurrentBlock > 0) {
+																/* Read the actual block */
+																bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
+																/* Write the free bytes in the block */
+																memcpy(b+inodes_x[fileDescriptor].position, buffer+copiedSoFar, bytesFreeOnCurrentBlock);
+																bwrite(DEVICE_IMAGE, u_block.dataBlocks[i], b);
+																/* Increment the seek descriptor */
+																inodes_x[fileDescriptor].position += bytesFreeOnCurrentBlock;
+																/* Increment bytes read */
+																copiedSoFar += bytesFreeOnCurrentBlock;
+																/* Subtract to bytes left to be read */
+																numBytes -= bytesFreeOnCurrentBlock;
+								}
+
+								/* Now we start to read blocks until all bytes are written */
 								while (numBytes > 0) {
-																memset(b, 0, BLOCK_SIZE);
-																if (bytesFreeOnCurrentBlock == BLOCK_SIZE) {
-																								bytesFreeOnCurrentBlock = 0;
-																}
-																/* Fill current block remaining space first (if any) */
-																if (bytesFreeOnCurrentBlock > 0) {
-																								bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
-																								memcpy(b+inodes_x[fileDescriptor].position, buffer+copiedSoFar, bytesFreeOnCurrentBlock);
-																								bwrite(DEVICE_IMAGE, u_block.dataBlocks[i], b);
-																								inodes_x[fileDescriptor].position += bytesFreeOnCurrentBlock;
-																								copiedSoFar += bytesFreeOnCurrentBlock;
-																								numBytes -= bytesFreeOnCurrentBlock;
-																								bytesFreeOnCurrentBlock = 0;
+																/* Then fill the new allocated blocks (if any) */
+																if (numBytes < BLOCK_SIZE) {
+																								/* Last operation if enters here */
+																								memcpy(b, buffer+copiedSoFar, numBytes);
+																								inodes_x[fileDescriptor].position += numBytes;
+																								copiedSoFar += numBytes;
+																								numBytes = 0;
 																} else {
-																								/* Then fill the new allocated blocks (if any) */
-																								if (numBytes < BLOCK_SIZE) {
-																																/* Last operation if enters here */
-																																memcpy(b, buffer+copiedSoFar, numBytes);
-																																inodes_x[fileDescriptor].position += numBytes;
-																																copiedSoFar += numBytes;
-																																numBytes = 0;
-																								} else {
-																																memcpy(b, buffer+copiedSoFar, BLOCK_SIZE);
-																																inodes_x[fileDescriptor].position += BLOCK_SIZE;
-																																copiedSoFar += BLOCK_SIZE;
-																																numBytes -= BLOCK_SIZE;
-																								}
-																								bwrite(DEVICE_IMAGE, u_block.dataBlocks[i], b);
-																								i++;
+																								memcpy(b, buffer+copiedSoFar, BLOCK_SIZE);
+																								inodes_x[fileDescriptor].position += BLOCK_SIZE;
+																								copiedSoFar += BLOCK_SIZE;
+																								numBytes -= BLOCK_SIZE;
 																}
-
-
-																printf("Aqui la blokada %d **********************\n", i);
-																printf("%s\n", b);
-																printf("******************************************\n");
+																bwrite(DEVICE_IMAGE, u_block.dataBlocks[i], b);
+																i++;
 								}
 
+								/* Write the updated indirect block */
 								bwrite(DEVICE_IMAGE, u_block_id, (char*)&u_block);
+								/* Increase the size of the file */
 								inodes[fileDescriptor].size += copiedSoFar;
 
+								/* Calculate the new checksum of the file */
 								unsigned char buf[BLOCK_SIZE];
 								inodes[fileDescriptor].checksum = 0;
 
@@ -529,10 +560,9 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 																inodes[fileDescriptor].checksum = CRC16(buf, BLOCK_SIZE, inodes[fileDescriptor].checksum);
 								}
 
-								printf("CHECKSUM CHANGED FILE: %d\n", inodes[fileDescriptor].checksum);
-
+								/* This is for the case in which the seek descriptor is at the EOF */
 								if (inodes_x[fileDescriptor].position == inodes[fileDescriptor].size) {
-									return 0;
+																return 0;
 								}
 
 								return copiedSoFar;
@@ -575,20 +605,21 @@ int lseekFile(int fileDescriptor, long offset, int whence)
  */
 int checkFile(char *fileName)
 {
+								int i;
 								int fd;
 								char b[BLOCK_SIZE];
-								unsigned char buf[BLOCK_SIZE];
-								int i;
-								fd = namei(fileName);
+								unsigned char buf[BLOCK_SIZE]; /* Unsigned chars needed in CRC function */
 
+								/* Search for the inode */
+								fd = namei(fileName);
 								if (fd < 0) {
 																fprintf(stderr, "Error in checkFile: No such file or directory");
 																return -2;
 								}
 
 								if (inodes_x[fd].opened == 1) {
-									fprintf(stderr, "Error in checkFile: %s is open\n", fileName);
-									return -2;
+																fprintf(stderr, "Error in checkFile: %s is open\n", fileName);
+																return -2;
 								}
 
 								printf("CHECKSUM de %s %u\n", fileName, inodes[fd].checksum);
@@ -635,6 +666,7 @@ int ialloc(void) {
 																								return i;
 																}
 								}
+								fprintf(stderr, "Error: maximum number of files reached\n");
 								return -1;
 }
 

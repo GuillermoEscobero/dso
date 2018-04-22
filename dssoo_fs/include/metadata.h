@@ -36,7 +36,7 @@ typedef struct {
 } superblock_t;
 
 typedef struct {
-  char name[FILENAME_MAXLEN];         /* File name */
+  char name[FILENAME_MAXLEN+1];         /* File name */
   unsigned int undirectBlock;         /* Indirect block ID containing the IDs of data blocks */
   unsigned int size;                  /* Size of the data contained in the file */
   uint16_t checksum;                  /* CRC16 checksum of data blocks of the file */

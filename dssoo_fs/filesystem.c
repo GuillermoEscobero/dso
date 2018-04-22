@@ -20,16 +20,6 @@ int mkFS(long deviceSize)
 								int i; /* Auxiliary counter */
 								int fd; /* File descriptor for DEVICE_IMAGE */
 
-								/* Ckeck if device image has correct size */
-								if (deviceSize < MIN_FILESYSTEM_SIZE) {
-																printf("ERROR: Disk too small\n");
-																return -1;
-								}
-								if (deviceSize > MAX_FILESYSTEM_SIZE) {
-																printf("ERROR: Disk too big\n");
-																return -1;
-								}
-
 								/* Open disk image for read and write */
 								fd = open(DEVICE_IMAGE, O_RDWR);
 								if (fd < 0) {
@@ -38,6 +28,16 @@ int mkFS(long deviceSize)
 								}
 								unsigned long size = (unsigned long)lseek(fd, 0, SEEK_END);
 								close(fd);
+
+								/* Ckeck if device image has correct size */
+								if (size < MIN_FILESYSTEM_SIZE) {
+																printf("ERROR: Disk too small\n");
+																return -1;
+								}
+								if (size > MAX_FILESYSTEM_SIZE) {
+																printf("ERROR: Disk too big\n");
+																return -1;
+								}
 
 								if (size < deviceSize) {
 									fprintf(stderr, "Error in mkFS: Disk too small\n");
@@ -343,17 +343,21 @@ int closeFile(int fileDescriptor)
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
 								char b[BLOCK_SIZE];
-								//unsigned int b_id;
 
+								/* Check the remaining bytes that can be read. If there are not
+								 *	enough, numBytes will be updated */
 								if (inodes_x[fileDescriptor].position+numBytes > inodes[fileDescriptor].size) {
 																numBytes = inodes[fileDescriptor].size - inodes_x[fileDescriptor].position;
 								}
 
+								/* If for any reason, the seek pointer is ahead the last byte
+								 * of the file, return -1 */
 								if (numBytes < 0) {
 																fprintf(stderr, "Error reading file: Segmentation fault\n");
 																return -1;
 								}
-
+								/* In this case, the seek pointer is located at EOF, so no bytes
+								 * can be read */
 								if (numBytes == 0) {
 									return 0;
 								}
@@ -473,7 +477,6 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 								i = bmap(fileDescriptor, inodes_x[fileDescriptor].position);;
 
 								while (numBytes > 0) {
-																//b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].position);
 																memset(b, 0, BLOCK_SIZE);
 																if (bytesFreeOnCurrentBlock == BLOCK_SIZE) {
 																								bytesFreeOnCurrentBlock = 0;

@@ -27,12 +27,11 @@
 #define TEST_PRINT(test_number, requirement_tested...) fprintf(stdout, "%s%s%s%s%s", "TEST NUMBER ", test_number, ": REQUIREMENT ", requirement_tested, "\n")
 
 int main() {
+    fprintf(stdout, "This test is designed to run on disks that have a minimum size of 3000 blocks, please run \"./create_disk 3000\" before running this test\n");
 
     //FUNCTIONAL REQUIREMENTS TESTS
     fprintf(stdout, "%s", "BASIC TESTING OF FUNCTIONAL REQUIREMENTS\n\n");
     
-    fprintf(stdout, "%s", "This test is designed to run on disks that have a minimum size of 3000 blocks, please run \"./create_disk 3000\" before running this test\n");
-
     /**
      * @test 1
      * @requirement F1.1, F9, NF6

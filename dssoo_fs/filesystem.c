@@ -203,7 +203,6 @@ int createFile(char *fileName) {
 
     /* Allocate indirect block */
     b_id = alloc();
-    printf("ALLOCADO el puto %d\n", b_id);
     if (b_id < 0) {
         ifree(inode_id); /* Free created inode */
         fprintf(stderr, "Error in createFile: disk is full\n");

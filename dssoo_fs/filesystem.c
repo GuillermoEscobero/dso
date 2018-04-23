@@ -52,7 +52,7 @@ int mkFS(long deviceSize)
 								unsigned int dataMapBlocks = deviceBlocks/BLOCK_SIZE;
 								printf("dataMapBlocks=%d\n", dataMapBlocks);
 
-								if ((dataMapBlocks%8) != 0) {
+								if ((dataMapBlocks%8) != 0 || dataMapBlocks == 0) {
 									dataMapBlocks = dataMapBlocks/8;
 									dataMapBlocks++;
 								}
@@ -212,7 +212,7 @@ int createFile(char *fileName)
 
 								/* Allocate indirect block */
 								b_id = alloc();
-								printf("ALLOCADO %d\n", b_id);
+								printf("ALLOCADO el puto %d\n", b_id);
 								if(b_id < 0) {
 																ifree(inode_id); /* Free created inode */
 																fprintf(stderr, "Error in createFile: disk is full\n");

@@ -20,9 +20,6 @@ int mkFS(long deviceSize)
 								int i; /* Auxiliary counter */
 								int fd; /* File descriptor for DEVICE_IMAGE */
 
-								char *newImap;
-								char *newBmap;
-
 								/* Open disk image for read and write */
 								fd = open(DEVICE_IMAGE, O_RDWR);
 								if (fd < 0) {
@@ -52,8 +49,16 @@ int mkFS(long deviceSize)
 
 								unsigned int deviceBlocks = deviceSize/BLOCK_SIZE; /* Floor function applied when casting to int */
 								unsigned int inodeMapBlocks = 1;
-								unsigned int dataMapBlocks = 1;
+								unsigned int dataMapBlocks = deviceBlocks/BLOCK_SIZE;
+								printf("dataMapBlocks=%d\n", dataMapBlocks);
+
+								if ((dataMapBlocks%8) != 0) {
+									dataMapBlocks = dataMapBlocks/8;
+									dataMapBlocks++;
+								}
+
 								unsigned int inodeBlocks = 1;
+								printf("dataMapBlocks=%d\n", dataMapBlocks);
 
 								unsigned int dataBlockNum = deviceBlocks - 1 - inodeMapBlocks - dataMapBlocks - inodeBlocks;
 
@@ -77,17 +82,17 @@ int mkFS(long deviceSize)
 								bwrite(DEVICE_IMAGE, 0, (char*)&sblock);
 
 								/* Allocate space in memory for inodes map and initialize its elements to 0 */
-								newImap = (char*)malloc(MAX_FILESYSTEM_OBJECTS_SUPPORTED/8); /* For allocating bits */
+								i_map = (char*)malloc(MAX_FILESYSTEM_OBJECTS_SUPPORTED/8); /* For allocating bits */
 								for (i = 0; i < sblock.numInodes; i++) {
 																// printf("Initializing newImap[%d]\n", i);
-																bitmap_setbit(newImap, i, 0);
+																bitmap_setbit(i_map, i, 0);
 								}
 
 								/* Allocate space in memory for data blocks map and initialize its elements to 0 */
-								newBmap = (char*)malloc((dataBlockNum/8)+1);
+								b_map = (char*)malloc((dataBlockNum/8)+1);
 								for (i = 0; i < sblock.dataBlockNum; i++) {
 																// printf("Initializing newBmap[%d]\n", i);
-																bitmap_setbit(newBmap, i, 0);
+																bitmap_setbit(b_map, i, 0);
 								}
 
 								/* Initialize array of iNodes to 0 */
@@ -102,8 +107,8 @@ int mkFS(long deviceSize)
 																return -1;
 								}
 
-								free(newImap);
-								free(newBmap);
+								//free(newImap);
+								//free(newBmap);
 
 								return 0;
 }
@@ -131,7 +136,7 @@ int mountFS(void)
 																}
 								}
 
-								b_map = (char*)malloc((sblock.dataBlockNum/8) +1);
+								b_map = (char*)malloc(sblock.dataMapNumBlock*BLOCK_SIZE);
 								/* Read disk block map */
 								for (i = 0; i < sblock.dataMapNumBlock; i++) {
 																if (bread(DEVICE_IMAGE, 1+i+sblock.inodeMapNumBlocks, ((char *)b_map + (i*BLOCK_SIZE/8))) < 0) {
@@ -207,6 +212,7 @@ int createFile(char *fileName)
 
 								/* Allocate indirect block */
 								b_id = alloc();
+								printf("ALLOCADO %d\n", b_id);
 								if(b_id < 0) {
 																ifree(inode_id); /* Free created inode */
 																fprintf(stderr, "Error in createFile: disk is full\n");

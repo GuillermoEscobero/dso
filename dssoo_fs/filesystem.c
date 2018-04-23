@@ -289,6 +289,9 @@ int removeFile(char *fileName) {
     memset(&(inodes[inode_id]), 0, sizeof(inode_t));
     ifree(inode_id);
 
+    inodes_x[inode_id].position = 0;
+    inodes_x[inode_id].opened = 0;
+
     return 0;
 }
 
@@ -306,7 +309,7 @@ int openFile(char *fileName) {
         return -1;
     }
 
-    inodes_x[inode_id].opened = 0;  /* Set file state to open */
+    inodes_x[inode_id].opened = 0;  /* Set file state to close for checkFile */
 
     if (checkFile(fileName) != 0) {
         return -2;
@@ -344,6 +347,11 @@ int readFile(int fileDescriptor, void *buffer, int numBytes) {
     unsigned int u_block_id; /* ID of the indirect block of the file */
     int copiedSoFar = 0; /* Bytes already read */
     int bytesRemainingOnCurrentBlock = 0; /* Bytes between the seek descriptor and the next block */
+
+    if (inodes_x[fileDescriptor].opened == 0) {
+      fprintf(stderr, "Error in readFile: file not opened\n");
+      return -1;
+    }
 
     /* Check the remaining bytes that can be read. If there are not
      * enough, numBytes will be updated */
@@ -432,6 +440,11 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes) {
 
     unsigned int blocksAlreadyUsed = 0;
     unsigned int blocksToAllocate = 0;
+
+    if (inodes_x[fileDescriptor].opened == 0) {
+      fprintf(stderr, "Error in writeFile: file not opened\n");
+      return -1;
+    }
 
     /* Check the remaining bytes that can be read. If there are not
      * enough, numBytes will be updated */

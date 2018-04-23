@@ -273,11 +273,11 @@ int main() {
     close(quijoteFileDescriptor);
 
     /**
-     * @test 16
+     * @test 15
      * @requirement F1.3
      * @description Unmount a file system
      */
-    TEST_PRINT("16", "F1.3");
+    TEST_PRINT("15", "F1.3");
     if (unmountFS() == 0) {
         TEST_PASSED("unmountFS");
     } else {
@@ -290,11 +290,11 @@ int main() {
     mountFS();
 
     /**
-     * @test 17
+     * @test 16
      * @requirement NF1
      * @description The maximum number of files in the file system will never be higher than 40.
      */
-    TEST_PRINT("17", "NF1");
+    TEST_PRINT("16", "NF1");
     char buffer[12] = {0};
     int iteration = 1;
     sprintf(buffer, "file%d.txt", iteration);
@@ -314,11 +314,11 @@ int main() {
     }
 
     /**
-     * @test 18
+     * @test 17
      * @requirement NF2
      * @description The maximum length of the file name will be 32 characters.
      */
-    TEST_PRINT("18", "NF2");
+    TEST_PRINT("17", "NF2");
     if (createFile("thisFilenameIsExactly32Chars.txt") == 0 && createFile("thisFilenameIsMoreThan32Chars.txt") == -2) {
         TEST_PASSED("file name length");
     } else {
@@ -326,11 +326,11 @@ int main() {
     }
 
     /**
-     * @test 19
+     * @test 18
      * @requirement NF3
      * @description The maximum size of the file will be 1 MiB.
      */
-    TEST_PRINT("19", "NF3");
+    TEST_PRINT("18", "NF3");
     testFileDescriptor = openFile("thisFilenameIsExactly32Chars.txt");
     char *superSizedArray = calloc(MAX_FILE_SIZE * 2, sizeof(char));
     if (writeFile(testFileDescriptor, superSizedArray, sizeof(char) * MAX_FILE_SIZE * 2) == MAX_FILE_SIZE) {

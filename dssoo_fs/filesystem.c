@@ -20,6 +20,9 @@ int mkFS(long deviceSize)
 								int i; /* Auxiliary counter */
 								int fd; /* File descriptor for DEVICE_IMAGE */
 
+								char *newImap;
+								char *newBmap;
+
 								/* Open disk image for read and write */
 								fd = open(DEVICE_IMAGE, O_RDWR);
 								if (fd < 0) {
@@ -74,17 +77,17 @@ int mkFS(long deviceSize)
 								bwrite(DEVICE_IMAGE, 0, (char*)&sblock);
 
 								/* Allocate space in memory for inodes map and initialize its elements to 0 */
-								i_map = (char*)malloc(MAX_FILESYSTEM_OBJECTS_SUPPORTED/8); /* For allocating bits */
+								newImap = (char*)malloc(MAX_FILESYSTEM_OBJECTS_SUPPORTED/8); /* For allocating bits */
 								for (i = 0; i < sblock.numInodes; i++) {
-																// printf("Initializing i_map[%d]\n", i);
-																bitmap_setbit(i_map, i, 0);
+																// printf("Initializing newImap[%d]\n", i);
+																bitmap_setbit(newImap, i, 0);
 								}
 
 								/* Allocate space in memory for data blocks map and initialize its elements to 0 */
-								b_map = (char*)malloc(dataBlockNum*sizeof(char));
+								newBmap = (char*)malloc((dataBlockNum/8)+1);
 								for (i = 0; i < sblock.dataBlockNum; i++) {
-																// printf("Initializing b_map[%d]\n", i);
-																b_map[i] = 0;
+																// printf("Initializing newBmap[%d]\n", i);
+																bitmap_setbit(newBmap, i, 0);
 								}
 
 								/* Initialize array of iNodes to 0 */
@@ -99,6 +102,9 @@ int mkFS(long deviceSize)
 																return -1;
 								}
 
+								free(newImap);
+								free(newBmap);
+
 								return 0;
 }
 
@@ -109,25 +115,26 @@ int mkFS(long deviceSize)
 int mountFS(void)
 {
 								int i;
+
 								/* Read superblock (disk block 0) and store it into sblock */
-								if (bread(DEVICE_IMAGE, 0, (char*)&(sblock)) < 0) {
+								if (bread(DEVICE_IMAGE, 0, (char*)&sblock) < 0) {
 																fprintf(stderr, "Error in mountFS: superblock cannot be read\n");
 																return -1;
 								}
 
-								i_map = (char*)malloc(MAX_FILESYSTEM_OBJECTS_SUPPORTED/8); /* For allocating bits */
+								i_map = (char*)malloc(BLOCK_SIZE); /* For allocating bits */
 								/* Read from disk inode map */
 								for (i = 0; i < sblock.inodeMapNumBlocks; i++) {
-																if (bread(DEVICE_IMAGE, 1+i, ((char *)i_map + i*BLOCK_SIZE))) {
+																if (bread(DEVICE_IMAGE, 1+i, ((char *)i_map + i*BLOCK_SIZE)) < 0) {
 																								fprintf(stderr, "Error in mountFS: can't read inodes map\n");
 																								return -1;
 																}
 								}
 
-								b_map = (char*)malloc(sblock.dataBlockNum*sizeof(char));
+								b_map = (char*)malloc((sblock.dataBlockNum/8) +1);
 								/* Read disk block map */
 								for (i = 0; i < sblock.dataMapNumBlock; i++) {
-																if (bread(DEVICE_IMAGE, 1+i+sblock.inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE))) {
+																if (bread(DEVICE_IMAGE, 1+i+sblock.inodeMapNumBlocks, ((char *)b_map + (i*BLOCK_SIZE/8))) < 0) {
 																								fprintf(stderr, "Error in mountFS: can't read data block map\n");
 																								return -1;
 																}
@@ -135,7 +142,7 @@ int mountFS(void)
 
 								/* Read inodes from disk */
 								for (i = 0; i < (sblock.numInodes*sizeof(inode_t)/BLOCK_SIZE); i++) {
-																if (bread(DEVICE_IMAGE, i+sblock.firstInodeBlock, ((char *)inodes + i*BLOCK_SIZE))) {
+																if (bread(DEVICE_IMAGE, i+sblock.firstInodeBlock, ((char *)inodes + i*BLOCK_SIZE)) < 0) {
 																								fprintf(stderr, "Error in mountFS: can't read iNodes\n");
 																								return -1;
 																}
@@ -166,10 +173,6 @@ int unmountFS(void)
 																fprintf(stderr, "Error in unmountFS: error while syncing metadata\n");
 																return -1;
 								}
-
-								/* Free resources */
-								free(i_map);
-								free(b_map);
 
 								return 0;
 }

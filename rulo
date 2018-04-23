@@ -1,0 +1,48 @@
+\begin{table}[H]
+\centering
+\label{fr-tests}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{||p{5cm}|p{5cm}|p{5cm}|p{5cm}|p{5cm}||}
+\hline
+ Test & Requirement verified & Input & Output & Does it meet the expected output?\\
+ \hline  \hline
+ File system is created (mkFS) & F1.1 & Size of the file system & The superblock of the system is initialized and written to the file system. Memory for the iNodes map and the data blocks bitmap is allocated and then both are initialiized to 0. The iNodes array has also memory allocated. All the metadata changes just applied are written to the file system (using fssync). At last a 0 is returned indicating the operation took place successfully & YES\\
+ \hline
+ File system is mounted (mountFS) & F1.2 & None & The superblock (initialized with mkFS), the iNode and data block maps and the iNodes array are read to the Device Image. At last returns a 0 & YES\\
+ \hline
+ File system is unmounted (unmountFS) & F1.3 & None & Synchronizes the metadata (fssync()) on the file system and frees the iNode and  data block maps. At last returns a 0. & YES\\
+ \hline
+ File is created on the file system (createFile) & F1.4 & Name of the file to create on the file system & The iNode and indirect block corresponding to the new file are allocated in memory as well as initialized. The indirect block is also written. At last a 0 is returned. & YES\\
+ \hline
+ Existing file is opened (openFile) & F1.6 & Name of the file to open & The file is marked as opened in its corresponding iNode and then the id of the file inside the file system (its iNode's id) is returned. & YES\\
+ \hline
+ Opened file is closed (closeFile) & F1.7 & File descriptor of file to be closed & The file's iNode is set to closed and a 0 is returned. & YES\\
+ \hline
+ Opened file is read (readFile)& F1.8 & File descriptor of file to be read, the memory address of the buffer to store the read values and the number of bytes to be read from the file. & The file's data blocks are accessed until covering the number of bytes specified or until the file ends. When finished, the number of bytes copied is returned. & YES\\
+ \hline
+ Opened file is written (writeFile) & F1.9 and F1.7 &  File descriptor of file to be written, the memory address of the buffer storing the values to be written and the number of bytes to be written into the file. & The data in the buffer is writteninto the data blocks of the file and if necessary new blocks are allocated to fit the data to be stored. At last the number of bytes wirtten is returned & YES\\
+ \hline
+ Seek pointer of file is modified (lseekFile) & F1.10 & File descriptor of the file whose pointer will be modified, the offset for the pointer and the reference point from which the pointer is desired to be moved (Offset starting at the end of the file, beginning of the file or with respect to the current position of the pointer of the file) & The position of the pointer stored in the file's iNode information is updated according to the parameters. At last a 0 is returned. & YES\\
+ \hline
+ Integrity on existing file is checked (checkFile) & F1.11 & File name of the file whose integrity will be checked & The file is read and a checksum is computed (using CRC16) which is compared to the alreaady existing file's checksum. At last it returns 0 as the integrity has been kept. & YES\\
+ \hline
+ Maximum size for a file's name is 32 characters & NF.2 & File with more than 32 characters as name & The name is checked when creating the file and an error with code -2 is returned. & YES\\
+ \hline
+\end{tabular}%
+}
+\end{table}
+
+\section{Non-Functional requirements}
+\begin{table}[H]
+\centering
+\label{rr-tests}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{||p{5cm}|p{5cm}|p{5cm}|p{5cm}|p{5cm}||}
+\hline
+ Test & Requirement verified & Input & Output & Does it meet the expected output?\\
+ \hline  \hline
+ Maximum size for a file's name is 32 characters & NF.2 & File with more than 32 characters as name & The name is checked when creating the file and an error with code -2 is returned. & YES\\
+ \hline
+\end{tabular}%
+}
+\end{table}

@@ -38,17 +38,12 @@ int main() {
      * its maximum size. The file system will be used on disks from 50 KiB to 10 MiB.
      */
     TEST_PRINT("1", "F1.1, F9, NF6");
-    if (mkFS(24 * BLOCK_SIZE) == -1 && mkFS(DEV_SIZE * 1000) == 0 && mkFS(25601 * BLOCK_SIZE) == -1) {
+    if (mkFS(24 * BLOCK_SIZE) == -1 && mkFS(BLOCK_SIZE * 3000) == 0 && mkFS(5121 * BLOCK_SIZE) == -1) {
         TEST_PASSED("mkFS");
     } else {
         TEST_FAILED("mkFS");
         return -1;
     }
-
-    mountFS();
-    unmountFS();
-    mountFS();
-    unmountFS();
 
     /**
      * @test 2
@@ -98,7 +93,8 @@ int main() {
      * @description Write to an opened file. A file could be modified by means of write operations.
      */
     TEST_PRINT("5", "F1.9, F7");
-    if (writeFile(testFileDescriptor, write_buffer, sizeof(write_buffer) - sizeof(char) * 8) == 0) {
+    if (writeFile(testFileDescriptor, write_buffer, sizeof(write_buffer) - sizeof(char) * 8) ==
+        sizeof(write_buffer) - sizeof(char) * 8) {
         lseekFile(testFileDescriptor, 0, FS_SEEK_BEGIN);
         if (writeFile(testFileDescriptor, write_buffer, sizeof(char) * 8) == sizeof(char) * 8) {
             TEST_PASSED("writeFile");
@@ -162,6 +158,10 @@ int main() {
     } else {
         TEST_FAILED("closeFile");
     }
+
+    // Testing writing on the device
+    unmountFS();
+    mountFS();
 
     /**
      * @test 9
@@ -278,12 +278,14 @@ int main() {
      * modification in the file system.
      */
     TEST_PRINT("15", "F3");
+    //FIXME:
     char *metadata_buffer2 = malloc(BLOCK_SIZE);
     unmountFS();
     mountFS();
     bread("disk.dat", 1, metadata_buffer2);
-    printf("metadata_buffer1:\n%s\n", metadata_buffer1);
-    printf("metadata_buffer1:\n%s\n", metadata_buffer2);
+    printf("******************DEBUG**********************Sstrcmp: %d\n", strcmp(metadata_buffer1, metadata_buffer2));
+    printf("metadata_buffer1: %s\n", metadata_buffer1);
+    printf("metadata_buffer2: %s\n", metadata_buffer2);
 
     if (strcmp(metadata_buffer1, metadata_buffer2) != 0) {
         TEST_PASSED("update metadata after write");
@@ -376,10 +378,15 @@ int main() {
      * @description Metadata shall persist between unmount and mount operations.
      */
     TEST_PRINT("21", "NF5");
-    bread("disk.dat", 2, read_buffer);
+    //FIXME:
+    bread("disk.dat", 1, read_buffer);
+    closeFile(testFileDescriptor);
     unmountFS();
     mountFS();
-    bread("disk.dat", 2, write_buffer);
+    bread("disk.dat", 1, write_buffer);
+    printf("******************DEBUG**********************Sstrcmp: %d\n", strcmp(read_buffer, write_buffer));
+    printf("read_buffer: %s\n", read_buffer);
+    printf("write_buffer: %s\n", write_buffer);
     if (strcmp(read_buffer, write_buffer) == 0) {
         TEST_PASSED("persistent metadata");
     } else {

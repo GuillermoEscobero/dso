@@ -49,7 +49,6 @@ int mkFS(long deviceSize) {
     unsigned int deviceBlocks = deviceSize / BLOCK_SIZE; /* Floor function applied when casting to int */
     unsigned int inodeMapBlocks = 1;
     unsigned int dataMapBlocks = deviceBlocks / BLOCK_SIZE;
-    printf("dataMapBlocks=%d\n", dataMapBlocks);
 
     if ((dataMapBlocks % 8) != 0 || dataMapBlocks == 0) {
         dataMapBlocks = dataMapBlocks / 8;
@@ -57,7 +56,6 @@ int mkFS(long deviceSize) {
     }
 
     unsigned int inodeBlocks = 1;
-    printf("dataMapBlocks=%d\n", dataMapBlocks);
 
     unsigned int dataBlockNum = deviceBlocks - 1 - inodeMapBlocks - dataMapBlocks - inodeBlocks;
 
@@ -105,9 +103,6 @@ int mkFS(long deviceSize) {
         fprintf(stderr, "mkFS failed: Error when syncing metadata\n");
         return -1;
     }
-
-    //free(newImap);
-    //free(newBmap);
 
     return 0;
 }

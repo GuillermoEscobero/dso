@@ -115,6 +115,7 @@ int mountFS(void)
 																return -1;
 								}
 
+								i_map = (char*)malloc(MAX_FILESYSTEM_OBJECTS_SUPPORTED/8); /* For allocating bits */
 								/* Read from disk inode map */
 								for (i = 0; i < sblock.inodeMapNumBlocks; i++) {
 																if (bread(DEVICE_IMAGE, 1+i, ((char *)i_map + i*BLOCK_SIZE))) {
@@ -123,6 +124,7 @@ int mountFS(void)
 																}
 								}
 
+								b_map = (char*)malloc(sblock.dataBlockNum*sizeof(char));
 								/* Read disk block map */
 								for (i = 0; i < sblock.dataMapNumBlock; i++) {
 																if (bread(DEVICE_IMAGE, 1+i+sblock.inodeMapNumBlocks, ((char *)b_map + i*BLOCK_SIZE))) {

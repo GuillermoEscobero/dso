@@ -1,0 +1,9 @@
+ERROR: Disk too small
+ERROR: Disk too big
+Error in createFile: file test.txt already exists
+Error in openFile: file random.txt not found
+Error in checkFile: test.txt is open
+Error in removeFile: file test.txt not found
+Error: maximum number of files reached
+Error in createFile: maximum number of files in the disk
+Error in createFile: file name too long

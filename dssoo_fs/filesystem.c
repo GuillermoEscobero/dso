@@ -315,7 +315,6 @@ int openFile(char *fileName) {
     inodes_x[inode_id].opened = 0;  /* Set file state to open */
 
     if (checkFile(fileName) != 0) {
-        // fprintf(stderr, "Error in openFile: file %s is corrupted\n", fileName);
         return -2;
     }
 
@@ -617,25 +616,24 @@ int checkFile(char *fileName) {
         return -2;
     }
 
-    printf("CHECKSUM de %s %u\n", fileName, inodes[fd].checksum);
+		/* 'Nonce' for CRC calculation */
     uint16_t now = 0;
 
+		/* Calculate number of blocks used by the file */
     unsigned int blocksAlreadyUsed = (inodes[fd].size + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
+		/* Retrieve indirect block of the file */
     unsigned int u_block_id = inodes[fd].undirectBlock;
     undirectBlock_t u_block;
     bread(DEVICE_IMAGE, u_block_id, (char *) &u_block);
 
+		/* Calculate CRC */
     for (i = 0; i < blocksAlreadyUsed; i++) {
-        printf("ID DE BLOCWUR(%d) %u\n", i, u_block.dataBlocks[i]);
         bread(DEVICE_IMAGE, u_block.dataBlocks[i], b);
         memmove(buf, b, BLOCK_SIZE);
         now = CRC16(buf, BLOCK_SIZE, now);
     }
 
-    printf("CHECKSUM now de %s %u\n", fileName, now);
-
-    // printf("CHECKSUM de %s %u\n", fileName, now);
     if (inodes[fd].checksum == now) {
         /* File not corrupted */
         return 0;
@@ -647,7 +645,10 @@ int checkFile(char *fileName) {
     return -1;
 }
 
-
+/*
+ * @brief   Search for a free inode and set its value in inodes map to 1
+ * @return  ID of the inode available if any, -1 if not
+ */
 int ialloc(void) {
     int i;
     /* To search for a free inode */
@@ -665,6 +666,11 @@ int ialloc(void) {
     return -1;
 }
 
+/*
+ * @brief   Search for a free data block, set its bytes to 0 and set its
+ *          value in data blocks map to 1
+ * @return  ID of the data block available if any, -1 if not
+ */
 int alloc(void) {
     int i;
     char buffer[BLOCK_SIZE];
@@ -684,6 +690,10 @@ int alloc(void) {
     return -1;
 }
 
+/*
+ * @brief   Sets the value of the inode provided to 0 in inodes map
+ * @return  0 if success, -1 if inode not found
+ */
 int ifree(int inode_id) {
     /* to check the inode_id vality */
     if (inode_id > sblock.numInodes) {
@@ -696,6 +706,10 @@ int ifree(int inode_id) {
     return 0;
 }
 
+/*
+ * @brief   Sets the value of the data block provided to 0 in data block map
+ * @return  0 if success, -1 if data block not found
+ */
 int bfree(int block_id) {
     /* to check the inode_id vality */
     if (block_id > sblock.dataBlockNum) {
@@ -708,6 +722,10 @@ int bfree(int block_id) {
     return 0;
 }
 
+/*
+ * @brief   Found the inode ID containing the file passed
+ * @return  ID of the inode, -1 if not found
+ */
 int namei(char *fname) {
     int i;
 
@@ -725,16 +743,16 @@ int namei(char *fname) {
     return -1;
 }
 
+/*
+ * @brief   Return the index of the data block that contains the byte indicated
+ *          by the offset
+ * @return  Index of the block, -1 if not found
+ */
 int bmap(int inode_id, int offset) {
     /* check for if it is a valid inode ID */
     if (inode_id > sblock.numInodes) {
         return -1;
     }
-
-    /* Este condicional esta bien si metemos algo para files pequeñas para optimizar*/
-    // if (offset < BLOCK_SIZE) {
-    //   return inodes[inode_id].directBlock;
-    // }
 
     unsigned int block = 0;
     while (offset >= BLOCK_SIZE) {
@@ -742,10 +760,13 @@ int bmap(int inode_id, int offset) {
         block++;
     }
 
-
     return block;
 }
 
+/*
+ * @brief   Writes the metadata in memory to the disk image
+ * @return  0 if success, -1 if error
+ */
 int fssync(void) {
     int i;
     /* Write super into disk */

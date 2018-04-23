@@ -33,7 +33,7 @@ int ifree(int inode_id);
 /*
  * @brief   Sets the value of the data block provided to 0 in data block map
  * @return  0 if success, -1 if data block not found
- * */
+ */
 int bfree(int block_id);
 
 /*

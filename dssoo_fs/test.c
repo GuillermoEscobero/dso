@@ -30,6 +30,8 @@ int main() {
 
     //FUNCTIONAL REQUIREMENTS TESTS
     fprintf(stdout, "%s", "BASIC TESTING OF FUNCTIONAL REQUIREMENTS\n\n");
+    
+    fprintf(stdout, "%s", "This test is designed to run on disks that have a minimum size of 3000 blocks, please run \"./create_disk 3000\" before running this test\n");
 
     /**
      * @test 1

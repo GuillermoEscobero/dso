@@ -20,7 +20,7 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 #define FILENAME_MAXLEN 32
 #define MAX_FILESYSTEM_OBJECTS_SUPPORTED 40
 #define MIN_FILESYSTEM_SIZE 51200
-#define MAX_FILESYSTEM_SIZE 52428800
+#define MAX_FILESYSTEM_SIZE 10465760
 #define METADATA_BLOCKS_NUM 4
 
 typedef struct {

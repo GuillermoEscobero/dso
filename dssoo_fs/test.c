@@ -270,31 +270,7 @@ int main() {
     }
     closeFile(testFileDescriptor);
     removeFile("test.txt");
-
-    /**
-     * @test 15
-     * @requirement F3
-     * @description Metadata shall be updated after any write operation in order to properly reflect any
-     * modification in the file system.
-     */
-    TEST_PRINT("15", "F3");
-    //FIXME:
-    char *metadata_buffer2 = malloc(BLOCK_SIZE);
-    unmountFS();
-    mountFS();
-    bread("disk.dat", 1, metadata_buffer2);
-    printf("******************DEBUG**********************Sstrcmp: %d\n", strcmp(metadata_buffer1, metadata_buffer2));
-    printf("metadata_buffer1: %s\n", metadata_buffer1);
-    printf("metadata_buffer2: %s\n", metadata_buffer2);
-
-    if (strcmp(metadata_buffer1, metadata_buffer2) != 0) {
-        TEST_PASSED("update metadata after write");
-    } else {
-        TEST_FAILED("update metadata after write");
-    }
-
     close(quijoteFileDescriptor);
-
 
     /**
      * @test 16
@@ -361,36 +337,6 @@ int main() {
         TEST_PASSED("1 MiB max file size");
     } else {
         TEST_FAILED("1 MiB max file size");
-    }
-
-    /**
-     * @test 20
-     * @requirement NF4
-     * @description The file system block size will be 2048 bytes.
-     */
-    TEST_PRINT("20", "NF4");
-    //TODO:
-    //bread("disk.dat", 1, );
-
-    /**
-     * @test 21
-     * @requirement NF5
-     * @description Metadata shall persist between unmount and mount operations.
-     */
-    TEST_PRINT("21", "NF5");
-    //FIXME:
-    bread("disk.dat", 1, read_buffer);
-    closeFile(testFileDescriptor);
-    unmountFS();
-    mountFS();
-    bread("disk.dat", 1, write_buffer);
-    printf("******************DEBUG**********************Sstrcmp: %d\n", strcmp(read_buffer, write_buffer));
-    printf("read_buffer: %s\n", read_buffer);
-    printf("write_buffer: %s\n", write_buffer);
-    if (strcmp(read_buffer, write_buffer) == 0) {
-        TEST_PASSED("persistent metadata");
-    } else {
-        TEST_FAILED("persistent metadata");
     }
 
     return 0;
